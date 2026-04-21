@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<title>DataLineage IQ v4.1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══ DESIGN TOKENS ═══ */
+:root{
+  --bg:#020810;--bg1:#060f1e;--bg2:#0b1730;--bg3:#101f3c;
+  --panel:rgba(255,255,255,.04);--panel2:rgba(255,255,255,.07);--panel3:rgba(255,255,255,.11);
+  --bdr:rgba(255,255,255,.07);--bdr2:rgba(255,255,255,.12);
+  --gold:#F5A623;--gold2:#FFD166;--gold3:#B8780A;
+  --teal:#00C9B1;--teal2:#4DDDC8;--teal3:#008F7E;
+  --sky:#3B9EFF;--sky2:#74BFFF;
+  --lime:#7FD962;--lime2:#A8EF8F;
+  --rose:#FF4F6D;--rose2:#FF8098;
+  --vio:#9B6DFF;--vio2:#BFA2FF;
+  --t0:#F2F8FF;--t1:#A8C4E0;--t2:#4E6E8A;--t3:#1E3450;
+  --r:10px;--r2:7px;--r3:4px;
+  --sh:0 8px 32px rgba(0,0,0,.55);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t0);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 130% 80% at -5% 0%,rgba(245,166,35,.09) 0%,transparent 55%),
+    radial-gradient(ellipse 80% 100% at 105% 20%,rgba(0,201,177,.07) 0%,transparent 50%),
+    radial-gradient(ellipse 60% 60% at 50% 110%,rgba(59,158,255,.06) 0%,transparent 55%)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(245,166,35,.016) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,201,177,.016) 1px,transparent 1px);
+  background-size:60px 60px}
+
+/* ═══ SCROLLBAR ═══ */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+
+/* ═══ HEADER ═══ */
+header{position:sticky;top:0;z-index:100;height:54px;
+  background:rgba(2,8,16,.92);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--bdr2);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-mark{width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--gold),var(--teal));
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  box-shadow:0 0 18px rgba(245,166,35,.35);animation:glow 3s ease-in-out infinite alternate}
+@keyframes glow{0%{box-shadow:0 0 18px rgba(245,166,35,.35)}100%{box-shadow:0 0 28px rgba(0,201,177,.4)}}
+.logo-title{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:2px;
+  background:linear-gradient(90deg,var(--gold2),var(--teal2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:8px;color:var(--t2);letter-spacing:2px;font-family:'JetBrains Mono',monospace}
+.api-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;
+  background:var(--panel);border:1px solid var(--bdr2);border-radius:20px;
+  font-size:10px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--lime);
+  box-shadow:0 0 8px var(--lime);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ═══ LAYOUT ═══ */
+.app{position:relative;z-index:1;display:grid;grid-template-columns:292px 1fr;min-height:calc(100vh - 54px)}
+
+/* ═══ SIDEBAR ═══ */
+.sb{background:var(--bg1);border-right:1px solid var(--bdr2);
+  height:calc(100vh - 54px);position:sticky;top:54px;
+  overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column}
+.sb-sec{padding:13px 12px;border-bottom:1px solid var(--bdr)}
+.sb-lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--t2);margin-bottom:9px;display:flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace}
+.sb-lbl::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--bdr2),transparent)}
+
+/* Search input */
+.srch-wrap{position:relative}
+.srch-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--gold)}
+input.srch{width:100%;height:37px;padding:0 9px 0 29px;
+  background:var(--panel);border:1px solid var(--bdr2);border-radius:var(--r2);
+  color:var(--t0);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:border-color .2s}
+input.srch:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(245,166,35,.1)}
+input.srch::placeholder{color:var(--t2)}
+.go-btn{width:100%;height:34px;margin-top:7px;border:none;border-radius:var(--r2);
+  background:linear-gradient(135deg,var(--gold3),var(--teal3));
+  color:#fff;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;
+  cursor:pointer;position:relative;overflow:hidden;box-shadow:0 0 14px rgba(245,166,35,.22);
+  transition:all .2s}
+.go-btn::before{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
+  transform:translateX(-100%);transition:transform .45s}
+.go-btn:hover::before{transform:translateX(100%)}
+.go-btn:hover{box-shadow:0 0 26px rgba(245,166,35,.45);transform:translateY(-1px)}
+.go-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* Source toggles */
+.src-tog{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:var(--r2);
+  cursor:pointer;transition:all .13s;margin-bottom:3px;border:1px solid transparent;user-select:none}
+.src-tog.on{background:var(--panel);border-color:var(--bdr2)}
+.src-tog:hover{background:var(--panel2)}
+.st-ico{font-size:12px;width:16px;text-align:center;flex-shrink:0}
+.st-name{font-size:11px;font-weight:600;color:var(--t0);flex:1}
+.st-desc{font-size:9px;color:var(--t2)}
+.st-dot{width:6px;height:6px;border-radius:50%;background:var(--t3);margin-left:auto;
+  margin-right:4px;flex-shrink:0;transition:all .3s}
+.st-dot.live{background:var(--lime);box-shadow:0 0 6px var(--lime)}
+.st-dot.file{background:var(--gold);box-shadow:0 0 6px var(--gold)}
+.st-dot.mock{background:var(--t2)}
+.st-dot.ai{background:var(--vio);box-shadow:0 0 6px var(--vio)}
+.chk-box{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--bdr2);
+  display:flex;align-items:center;justify-content:center;font-size:9px;
+  color:transparent;transition:all .13s;flex-shrink:0}
+.src-tog.on .chk-box{background:linear-gradient(135deg,var(--gold),var(--teal));
+  border-color:transparent;color:#fff;box-shadow:0 0 8px rgba(245,166,35,.3)}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:var(--panel);border:1px solid var(--bdr);border-radius:9px;
+  padding:2px 8px;font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--teal2);
+  cursor:pointer;transition:all .11s;user-select:none}
+.chip:hover{background:linear-gradient(135deg,var(--gold3),var(--teal3));
+  border-color:transparent;color:#fff;transform:translateY(-1px)}
+
+/* Config inputs */
+.cfg-lbl{font-size:9px;color:var(--t2);display:block;margin-bottom:3px;
+  font-family:'JetBrains Mono',monospace}
+.cfg-in{width:100%;height:26px;padding:0 7px;margin-bottom:5px;
+  background:var(--panel);border:1px solid var(--bdr);border-radius:var(--r3);
+  color:var(--t0);font-size:10px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .15s}
+.cfg-in:focus{border-color:var(--gold)}
+.cfg-in::placeholder{color:var(--t3)}
+.cfg-sec{font-size:9px;font-weight:700;color:var(--gold2);margin:8px 0 5px;
+  letter-spacing:.5px;font-family:'JetBrains Mono',monospace}
+details>summary{cursor:pointer;user-select:none;list-style:none;font-size:10px;
+  font-weight:700;color:var(--gold2);font-family:'JetBrains Mono',monospace;letter-spacing:.5px}
+details>summary::-webkit-details-marker{display:none}
+
+/* Multi-field textarea */
+.multi-ta{width:100%;background:var(--panel);border:1px solid var(--bdr2);
+  border-radius:var(--r3);color:var(--t0);font-size:10px;
+  font-family:'JetBrains Mono',monospace;padding:7px 8px;resize:none;outline:none;
+  line-height:1.5;transition:border-color .15s}
+.multi-ta:focus{border-color:var(--teal)}
+.multi-btn{width:100%;height:27px;margin-top:5px;background:linear-gradient(135deg,var(--teal3),#1d6fa6);
+  border:none;border-radius:var(--r3);color:#fff;font-size:10px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;transition:all .15s}
+.multi-btn:hover{box-shadow:0 0 16px rgba(0,201,177,.35);transform:translateY(-1px)}
+
+/* Upload */
+.upload-btn{width:100%;height:27px;background:var(--panel);border:1px solid var(--bdr2);
+  border-radius:var(--r3);color:var(--t1);font-size:10px;font-weight:600;cursor:pointer;transition:all .13s}
+.upload-btn:hover{background:var(--panel2)}
+#upload-status{font-size:9px;color:var(--t2);margin-top:4px;
+  font-family:'JetBrains Mono',monospace;min-height:14px;line-height:1.5}
+
+/* AI panel */
+.ai-panel{margin-top:8px;padding:10px;
+  background:linear-gradient(135deg,rgba(155,109,255,.08),rgba(0,201,177,.05));
+  border:1px solid rgba(155,109,255,.2);border-radius:var(--r2);
+  border-left:3px solid var(--vio)}
+.ai-panel-title{font-size:9px;font-weight:700;color:var(--vio2);letter-spacing:.8px;
+  text-transform:uppercase;margin-bottom:5px;font-family:'JetBrains Mono',monospace}
+.ai-text{font-size:10px;color:var(--t1);line-height:1.55;font-style:italic}
+
+/* Recent */
+.recent-item{padding:5px 7px;border-radius:var(--r3);cursor:pointer;
+  font-size:10px;color:var(--t1);font-family:'JetBrains Mono',monospace;
+  transition:all .11s;border:1px solid transparent}
+.recent-item:hover{background:var(--panel);border-color:var(--bdr)}
+.recent-item::before{content:'⟳ ';color:var(--t3)}
+
+/* ═══ MAIN ═══ */
+.main{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.top-bar{padding:12px 18px 0;border-bottom:1px solid var(--bdr2);
+  background:rgba(2,8,16,.8);backdrop-filter:blur(16px);flex-shrink:0}
+.res-bar{display:flex;align-items:center;gap:7px;padding-bottom:10px;flex-wrap:wrap}
+.res-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;
+  background:linear-gradient(90deg,var(--t0),var(--gold2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;flex:1}
+.spill{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
+  font-size:9px;font-family:'JetBrains Mono',monospace;border:1px solid var(--bdr)}
+.sdot{width:5px;height:5px;border-radius:50%}
+.sp-live{border-color:rgba(127,217,98,.3);color:var(--lime2)}
+.sp-file{border-color:rgba(245,166,35,.3);color:var(--gold2)}
+.sp-mock{border-color:rgba(78,110,138,.3);color:var(--t1)}
+.sp-ai{border-color:rgba(155,109,255,.3);color:var(--vio2)}
+.exp-row{display:flex;gap:5px}
+.exp-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border:none;
+  border-radius:var(--r3);font-size:10px;font-weight:700;cursor:pointer;transition:all .14s}
+.exp-xl{background:linear-gradient(135deg,#14532d,#16a34a);color:#fff}
+.exp-xl:hover{box-shadow:0 0 20px rgba(22,163,74,.4);transform:translateY(-1px)}
+.exp-js{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff}
+.exp-js:hover{box-shadow:0 0 20px rgba(37,99,235,.4);transform:translateY(-1px)}
+
+/* Tabs */
+.tabs{display:flex;gap:3px;background:var(--panel);
+  border:1px solid var(--bdr2);border-radius:var(--r2);padding:3px;width:fit-content}
+.tab-btn{padding:5px 13px;border-radius:5px;font-size:11px;font-weight:600;
+  cursor:pointer;color:var(--t2);border:none;background:transparent;transition:all .13s}
+.tab-btn.on{background:linear-gradient(135deg,var(--gold3),var(--teal3));color:#fff;
+  box-shadow:0 0 12px rgba(245,166,35,.28)}
+.tab-btn:hover:not(.on){color:var(--t0);background:var(--panel2)}
+
+.content{padding:14px 18px;overflow-y:auto;flex:1}
+
+/* ═══ EMPTY / LOADING ═══ */
+.empty{display:flex;flex-direction:column;align-items:center;padding:80px 40px;text-align:center}
+.empty-icon{font-size:54px;margin-bottom:12px;
+  filter:drop-shadow(0 0 18px rgba(245,166,35,.35));animation:float 3.5s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.empty-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;
+  background:linear-gradient(90deg,var(--gold2),var(--teal2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.empty-desc{font-size:12px;color:var(--t2);max-width:340px;line-height:1.7}
+.cta-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+
+.loading{display:none;flex-direction:column;align-items:center;padding:80px;gap:13px;text-align:center}
+.loading.show{display:flex}
+.ring{width:42px;height:42px;position:relative}
+.ring::before,.ring::after{content:'';position:absolute;border-radius:50%;border:2px solid transparent}
+.ring::before{inset:0;border-top-color:var(--gold);animation:spin .75s linear infinite}
+.ring::after{inset:5px;border-top-color:var(--teal);animation:spin .5s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ld-steps{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.ld-step{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);
+  opacity:.2;transition:opacity .3s;font-family:'JetBrains Mono',monospace}
+.ld-step.active{opacity:1;color:var(--gold2)}
+.ld-step.done{opacity:.55;color:var(--lime)}
+
+/* ═══ GRAPH PANE ═══ */
+.ctrl-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:11px}
+.lv-bar{display:flex;background:var(--panel);border:1px solid var(--bdr2);border-radius:var(--r2);overflow:hidden}
+.lv-btn{padding:5px 12px;border:none;background:transparent;font-size:11px;font-weight:600;
+  cursor:pointer;color:var(--t2);border-right:1px solid var(--bdr);transition:all .13s}
+.lv-btn:last-child{border-right:none}
+.lv-btn.on{background:linear-gradient(135deg,rgba(245,166,35,.18),rgba(0,201,177,.18));color:var(--gold2)}
+.bc{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.bc-item{color:var(--teal2);cursor:pointer}.bc-item:hover{text-decoration:underline}
+.bc-sep{color:var(--t3)}.bc-cur{color:var(--t0);cursor:default}
+.view-tog{display:flex;background:var(--panel);border:1px solid var(--bdr2);border-radius:var(--r2);overflow:hidden}
+.vt-btn{padding:5px 11px;border:none;background:transparent;font-size:10px;font-weight:600;
+  cursor:pointer;color:var(--t2);border-right:1px solid var(--bdr);transition:all .13s}
+.vt-btn:last-child{border-right:none}
+.vt-btn.on{background:linear-gradient(135deg,rgba(0,201,177,.15),rgba(59,158,255,.15));color:var(--teal2)}
+
+.gbox{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.g-hdr{padding:9px 13px;border-bottom:1px solid var(--bdr2);
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(90deg,rgba(245,166,35,.05),transparent)}
+.g-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;color:var(--t0)}
+.g-sub{font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.g-tools{display:flex;gap:3px}
+.g-btn{width:25px;height:25px;background:var(--panel);border:1px solid var(--bdr2);
+  border-radius:4px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--t1);font-size:11px;transition:all .13s}
+.g-btn:hover{background:var(--gold3);color:#fff;border-color:var(--gold);box-shadow:0 0 9px rgba(245,166,35,.3)}
+.g-legend{display:flex;gap:11px;padding:6px 13px;border-top:1px solid var(--bdr);
+  background:rgba(2,8,16,.5);flex-wrap:wrap}
+.leg-i{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.leg-d{width:7px;height:7px;border-radius:50%}
+
+/* ERD */
+#erd-view{height:490px;position:relative;overflow:hidden;cursor:grab;user-select:none}
+#erd-view:active{cursor:grabbing}
+#erd-world{position:absolute;transform-origin:0 0}
+#erd-pan{width:100%;height:100%;position:absolute;top:0;left:0}
+#erd-host{position:absolute;top:0;left:0;width:3000px;height:2000px}
+#erd-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;width:3000px;height:2000px}
+.erd-card{position:absolute;border-radius:7px;overflow:hidden;min-width:190px;
+  box-shadow:0 4px 16px rgba(0,0,0,.5);backdrop-filter:blur(4px)}
+.erd-hdr{padding:7px 10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid}
+.erd-drag{cursor:move;display:flex;align-items:center;gap:6px;flex:1;overflow:hidden}
+.erd-ico{font-size:11px;flex-shrink:0}
+.erd-name{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.erd-badge{font-size:7px;font-weight:800;padding:1px 5px;border-radius:3px;letter-spacing:.5px}
+.erd-fc{font-size:8px;opacity:.4;flex-shrink:0}
+.erd-field{display:flex;align-items:center;padding:3px 9px;
+  border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .08s}
+.erd-field:last-child{border-bottom:none}
+.erd-field:hover{background:rgba(255,255,255,.07)}
+.erd-field.hi{background:rgba(245,166,35,.1);border-left:2px solid var(--gold)}
+.erd-anc{width:8px;height:8px;border-radius:50%;flex-shrink:0;border:1.5px solid}
+.erd-fn{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0 5px}
+.erd-ft{font-size:8px;color:var(--t2);font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.erd-frisk{width:5px;height:5px;border-radius:50%;margin-left:4px;flex-shrink:0}
+/* Card themes */
+.ec-src{border:1.5px solid rgba(127,217,98,.35);background:linear-gradient(160deg,rgba(127,217,98,.07),rgba(6,15,30,.97))}
+.ec-src .erd-hdr{background:rgba(127,217,98,.1);border-color:rgba(127,217,98,.2)}
+.ec-src .erd-name{color:var(--lime2)}.ec-src .erd-badge{background:rgba(127,217,98,.18);color:var(--lime2)}
+.ec-src .erd-anc{border-color:rgba(127,217,98,.45);background:rgba(127,217,98,.1)}
+.ec-tgt{border:1.5px solid rgba(59,158,255,.35);background:linear-gradient(160deg,rgba(59,158,255,.07),rgba(6,15,30,.97))}
+.ec-tgt .erd-hdr{background:rgba(59,158,255,.1);border-color:rgba(59,158,255,.2)}
+.ec-tgt .erd-name{color:var(--sky2)}.ec-tgt .erd-badge{background:rgba(59,158,255,.18);color:var(--sky2)}
+.ec-tgt .erd-anc{border-color:rgba(59,158,255,.45);background:rgba(59,158,255,.1)}
+.ec-trf{border:1.5px solid rgba(245,166,35,.35);background:linear-gradient(160deg,rgba(245,166,35,.07),rgba(6,15,30,.97))}
+.ec-trf .erd-hdr{background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.2)}
+.ec-trf .erd-name{color:var(--gold2)}.ec-trf .erd-badge{background:rgba(245,166,35,.18);color:var(--gold2)}
+.ec-trf .erd-anc{border-color:rgba(245,166,35,.45);background:rgba(245,166,35,.1)}
+.ec-code{border:1.5px solid rgba(0,201,177,.35);background:linear-gradient(160deg,rgba(0,201,177,.07),rgba(6,15,30,.97))}
+.ec-code .erd-hdr{background:rgba(0,201,177,.1);border-color:rgba(0,201,177,.2)}
+.ec-code .erd-name{color:var(--teal2)}.ec-code .erd-badge{background:rgba(0,201,177,.18);color:var(--teal2)}
+.ec-code .erd-anc{border-color:rgba(0,201,177,.45);background:rgba(0,201,177,.1)}
+
+/* Level cards */
+.lv-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}
+.lv-card{background:var(--panel);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:11px;cursor:pointer;transition:all .17s}
+.lv-card:hover{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 6px 18px rgba(245,166,35,.14)}
+.lv-card-icon{font-size:18px;margin-bottom:4px}
+.lv-card-name{font-weight:700;font-size:11px;margin-bottom:3px}
+.lv-card-desc{font-size:9px;color:var(--t2);line-height:1.4}
+
+/* ═══ METADATA ═══ */
+.meta-grid{display:grid;grid-template-columns:1fr 308px;gap:13px;align-items:start}
+.meta-tbl{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+  overflow:hidden;box-shadow:var(--sh)}
+.meta-hdr{display:grid;padding:8px 12px;
+  background:linear-gradient(90deg,rgba(245,166,35,.08),rgba(0,201,177,.06));
+  border-bottom:1px solid var(--bdr2);font-size:9px;font-weight:700;color:var(--t2);
+  text-transform:uppercase;letter-spacing:.5px;font-family:'JetBrains Mono',monospace}
+.meta-row{display:grid;padding:8px 12px;border-bottom:1px solid var(--bdr);
+  cursor:pointer;transition:background .1s;align-items:center}
+.meta-row:hover{background:var(--panel2)}
+.meta-row.sel{background:linear-gradient(90deg,rgba(245,166,35,.07),rgba(0,201,177,.05));
+  border-left:2px solid var(--gold)}
+.meta-row:last-child{border-bottom:none}
+
+/* Field detail */
+.fdetail{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+  overflow:hidden;position:sticky;top:13px;box-shadow:var(--sh)}
+.fd-head{padding:12px 13px;background:linear-gradient(135deg,rgba(245,166,35,.08),rgba(0,201,177,.06));
+  border-bottom:1px solid var(--bdr2)}
+.fd-name{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;
+  background:linear-gradient(90deg,var(--gold2),var(--teal2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.fd-tbl{font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.fd-body{padding:12px 13px;max-height:calc(100vh - 260px);overflow-y:auto}
+.fd-sec{margin-bottom:12px}
+.fd-sec-t{font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:6px;padding-bottom:3px;
+  border-bottom:1px solid var(--bdr);font-family:'JetBrains Mono',monospace}
+.fd-row{display:flex;gap:6px;margin-bottom:4px;align-items:flex-start}
+.fd-k{font-size:9px;font-weight:600;color:var(--t2);min-width:90px;flex-shrink:0;
+  margin-top:1px;font-family:'JetBrains Mono',monospace}
+.fd-v{font-size:11px;color:var(--t0);line-height:1.5}
+.fd-code{background:rgba(0,0,0,.45);border:1px solid var(--bdr2);border-radius:4px;
+  padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--teal2);
+  line-height:1.6;overflow-x:auto;word-break:break-all;margin-top:3px;
+  border-left:2px solid var(--gold)}
+.lineage-flow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:4px}
+.lf-n{background:var(--panel);border:1px solid var(--bdr2);border-radius:3px;
+  padding:3px 7px;font-family:'JetBrains Mono',monospace;font-size:9px}
+.lf-src{border-color:rgba(127,217,98,.3);color:var(--lime2)}
+.lf-tgt{border-color:rgba(59,158,255,.3);color:var(--sky2)}
+.lf-arr{color:var(--t3);font-size:12px}
+.pdf-btn{width:100%;height:29px;background:linear-gradient(135deg,var(--gold3),var(--teal3));
+  border:none;border-radius:var(--r2);color:#fff;font-family:'Bebas Neue',sans-serif;
+  font-size:14px;letter-spacing:2px;cursor:pointer;transition:all .18s;
+  box-shadow:0 0 12px rgba(245,166,35,.22)}
+.pdf-btn:hover{box-shadow:0 0 24px rgba(245,166,35,.42);transform:translateY(-1px)}
+.fd-foot{padding:9px 13px;border-top:1px solid var(--bdr);background:rgba(2,8,16,.45)}
+
+/* SOR cards */
+.sor-card{background:rgba(0,0,0,.3);border:1px solid var(--bdr);border-radius:5px;
+  padding:5px 8px;margin-bottom:3px;display:flex;align-items:center;gap:5px;cursor:pointer;transition:all .11s}
+.sor-card:hover{background:var(--panel2)}
+.sor-card.auth{border-left:2px solid var(--gold);background:rgba(245,166,35,.05)}
+.sor-name{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;flex:1}
+.sor-sys{font-size:8px;color:var(--t2)}
+.sor-auth{margin-left:auto;font-size:8px;font-weight:700;color:var(--gold2);
+  background:rgba(245,166,35,.12);padding:1px 5px;border-radius:3px;flex-shrink:0}
+
+/* Hop rows */
+.hop-row{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.hop-n{width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,var(--gold3),var(--teal3));
+  display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;
+  color:#fff;flex-shrink:0}
+.hop-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t1);flex:1}
+.hop-type{font-size:8px;color:var(--t3)}
+
+/* Equiv fields */
+.eq-item{display:inline-block;margin:2px;padding:2px 7px;background:var(--panel);
+  border:1px solid var(--bdr2);border-radius:8px;font-size:9px;
+  font-family:'JetBrains Mono',monospace;color:var(--teal2);cursor:pointer;transition:all .1s}
+.eq-item:hover{background:var(--panel2)}
+.eq-exact{border-color:rgba(127,217,98,.35);color:var(--lime2)}
+
+/* Badges */
+.rb{padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.3px}
+.rb-H{background:rgba(255,79,109,.1);color:var(--rose2);border:1px solid rgba(255,79,109,.25)}
+.rb-M{background:rgba(245,166,35,.1);color:var(--gold2);border:1px solid rgba(245,166,35,.25)}
+.rb-L{background:rgba(127,217,98,.1);color:var(--lime2);border:1px solid rgba(127,217,98,.25)}
+/* Unified search source pills */
+.src-pill{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;
+  font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--t2);
+  background:var(--panel);border:1px solid var(--bdr);cursor:default;transition:all .2s}
+.src-pill.live{border-color:rgba(127,217,98,.35);color:var(--lime2)}
+.src-pill.file{border-color:rgba(245,166,35,.35);color:var(--gold2)}
+.src-pill.mock{border-color:var(--bdr);color:var(--t3)}
+.src-pill.active{border-color:rgba(0,201,177,.35);color:var(--teal2)}
+.sp-dot{width:5px;height:5px;border-radius:50%;background:var(--t3);flex-shrink:0;transition:all .3s}
+.src-pill.live  .sp-dot{background:var(--lime);box-shadow:0 0 5px var(--lime)}
+.src-pill.file  .sp-dot{background:var(--gold);box-shadow:0 0 5px var(--gold)}
+.src-pill.active .sp-dot{background:var(--teal);box-shadow:0 0 5px var(--teal)}
+/* AI Summary box in main content */
+.ai-summary-box{margin-bottom:14px;padding:14px 16px;
+  background:linear-gradient(135deg,rgba(155,109,255,.08),rgba(0,201,177,.06));
+  border:1px solid rgba(155,109,255,.22);border-radius:var(--r);border-left:3px solid var(--vio);
+  box-shadow:var(--sh)}
+.ai-sum-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ai-sum-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;
+  background:linear-gradient(90deg,var(--vio2),var(--teal2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ai-sum-badge{font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px;
+  background:rgba(155,109,255,.15);color:var(--vio2);border:1px solid rgba(155,109,255,.25);
+  font-family:'JetBrains Mono',monospace}
+.ai-sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.ai-sum-card{background:rgba(0,0,0,.3);border:1px solid var(--bdr);border-radius:6px;padding:9px 11px}
+.ai-sum-card-label{font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:5px;font-family:'JetBrains Mono',monospace}
+.ai-sum-card-val{font-size:11px;color:var(--t0);line-height:1.55}
+.ai-sum-insight{font-size:11px;color:var(--t1);line-height:1.6;font-style:italic;
+  padding:8px 11px;background:rgba(155,109,255,.05);border-radius:5px;border-left:2px solid var(--vio)}
+@keyframes shimmer{0%{left:-100%}60%,100%{left:200%}}
+@keyframes aiPulse{0%,100%{box-shadow:0 0 16px rgba(155,109,255,.2)}50%{box-shadow:0 0 28px rgba(155,109,255,.4)}}
+#ai-trigger-btn:hover{border-color:rgba(155,109,255,.5);background:linear-gradient(135deg,rgba(155,109,255,.18),rgba(0,201,177,.12));transform:translateY(-1px);box-shadow:0 6px 24px rgba(155,109,255,.2)}
+#ai-trigger-btn:hover #ai-btn-arrow{transform:translateX(4px)}
+@keyframes typeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.ai-typing{animation:typeIn .4s ease forwards}
+.dtype{background:rgba(59,158,255,.1);border:1px solid rgba(59,158,255,.2);
+  border-radius:3px;padding:1px 5px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--sky2)}
+.tag{background:var(--panel);border:1px solid var(--bdr);border-radius:8px;
+  padding:1px 6px;font-size:8px;color:var(--t1);display:inline-block;margin:1px}
+.conf-pill{display:inline-block;padding:2px 7px;border-radius:8px;font-size:8px;
+  font-weight:700;letter-spacing:.4px;font-family:'JetBrains Mono',monospace}
+.conf-pii-r{background:rgba(255,79,109,.12);color:#FF8098;border:1px solid rgba(255,79,109,.25)}
+.conf-pii-c{background:rgba(239,68,68,.12);color:#F87171;border:1px solid rgba(239,68,68,.25)}
+.conf-conf{background:rgba(245,166,35,.12);color:var(--gold2);border:1px solid rgba(245,166,35,.25)}
+.conf-int{background:rgba(59,158,255,.08);color:var(--sky2);border:1px solid rgba(59,158,255,.2)}
+.conf-pub{background:rgba(127,217,98,.08);color:var(--lime2);border:1px solid rgba(127,217,98,.2)}
+.ing-pill{border-radius:8px;padding:2px 7px;font-size:9px;font-family:'JetBrains Mono',monospace;display:inline-block}
+.ing-batch{background:rgba(59,158,255,.08);color:var(--sky2);border:1px solid rgba(59,158,255,.2)}
+.ing-rt{background:rgba(245,166,35,.1);color:var(--gold2);border:1px solid rgba(245,166,35,.2)}
+.risk-tbl{background:rgba(0,0,0,.3);border:1px solid var(--bdr);border-radius:4px;overflow:hidden}
+.risk-row{display:grid;grid-template-columns:72px 1fr;border-bottom:1px solid var(--bdr)}
+.risk-row:last-child{border-bottom:none}
+.risk-l{padding:5px 7px;display:flex;align-items:center;gap:3px;font-size:9px;font-weight:700}
+.risk-r{padding:5px 7px;border-left:1px solid var(--bdr)}
+.risk-rd{font-size:9px;color:var(--t0)}.risk-ra{font-size:8px;color:var(--t2);margin-top:1px}
+
+/* ═══ SOURCES ═══ */
+.src-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(275px,1fr));gap:11px}
+.src-card{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+  padding:13px;box-shadow:var(--sh);transition:all .17s}
+.src-card:hover{border-color:var(--bdr2);transform:translateY(-1px)}
+.sc-hdr{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.sc-ico{width:25px;height:25px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.sc-name{font-size:12px;font-weight:700}
+.sc-stat{font-size:9px;font-family:'JetBrains Mono',monospace;margin-top:1px}
+.sc-badge{padding:2px 6px;border-radius:8px;font-size:8px;font-weight:700;letter-spacing:.4px;margin-left:auto}
+.b-live{background:rgba(127,217,98,.1);color:var(--lime2);border:1px solid rgba(127,217,98,.2)}
+.b-file{background:rgba(245,166,35,.1);color:var(--gold2);border:1px solid rgba(245,166,35,.2)}
+.b-mock{background:rgba(78,110,138,.1);color:var(--t1);border:1px solid var(--bdr)}
+.b-ai{background:rgba(155,109,255,.1);color:var(--vio2);border:1px solid rgba(155,109,255,.2)}
+.code-blk{background:rgba(0,0,0,.45);border:1px solid var(--bdr);border-radius:4px;
+  padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--teal2);
+  line-height:1.6;overflow-x:auto;word-break:break-all;margin:4px 0}
+.lang-pill{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;
+  font-family:'JetBrains Mono',monospace;margin-bottom:3px}
+.lp-SQL{background:#0d2035;color:#38BDF8}.lp-Python,.lp-PySpark{background:#0d1d0d;color:#34D399}
+.lp-Java,.lp-Scala{background:#1d0d0d;color:#F87171}
+.lp-HQL,.lp-Shell{background:#180d1d;color:#C084FC}
+.lp-JSON,.lp-YAML,.lp-XML{background:#1d1808;color:#FCD34D}
+.ai-insight-card{margin-top:6px;padding:8px 10px;
+  background:linear-gradient(135deg,rgba(155,109,255,.08),rgba(0,201,177,.05));
+  border:1px solid rgba(155,109,255,.18);border-radius:4px;border-left:2px solid var(--vio)}
+.ai-insight-text{font-size:9px;color:var(--vio2);line-height:1.55;font-style:italic}
+
+/* ═══ MULTI ═══ */
+.mres-card{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+  padding:13px;margin-bottom:10px;box-shadow:var(--sh)}
+.mres-hdr{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+  background:linear-gradient(90deg,var(--gold2),var(--teal2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+
+/* ═══ TOAST ═══ */
+.toast{position:fixed;bottom:16px;right:16px;z-index:500;
+  background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r2);
+  padding:9px 13px;font-size:11px;color:var(--t0);box-shadow:var(--sh);
+  transform:translateY(60px);transition:transform .22s;
+  display:flex;align-items:center;gap:6px;border-left:3px solid var(--gold);max-width:320px}
+.toast.show{transform:translateY(0)}
+
+/* ═══ MODAL ═══ */
+.overlay{position:fixed;inset:0;background:rgba(2,8,16,.88);backdrop-filter:blur(14px);
+  z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+  width:100%;max-width:500px;max-height:86vh;overflow-y:auto;
+  transform:translateY(16px);transition:transform .2s;box-shadow:0 24px 64px rgba(0,0,0,.8)}
+.overlay.open .modal{transform:translateY(0)}
+.modal-hdr{padding:13px 17px;border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(90deg,rgba(245,166,35,.06),transparent);position:sticky;top:0}
+.modal-title{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--teal2)}
+.modal-x{width:24px;height:24px;border-radius:4px;border:1px solid var(--bdr2);
+  background:var(--panel);color:var(--t1);cursor:pointer;font-size:12px;
+  display:flex;align-items:center;justify-content:center;transition:all .12s}
+.modal-x:hover{background:var(--rose);border-color:var(--rose);color:#fff}
+.modal-body{padding:17px}
+.modal-foot{padding:9px 17px;border-top:1px solid var(--bdr);
+  display:flex;justify-content:flex-end;background:rgba(2,8,16,.45)}
+.action-bar-btn{display:flex;align-items:center;gap:6px;padding:9px 16px;border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+#multi-action-bar{display:none;padding:10px 18px;background:linear-gradient(90deg,rgba(245,166,35,.08),rgba(0,201,177,.06));
+  border-bottom:2px solid rgba(245,166,35,.3);position:sticky;top:0;z-index:50;
+  flex-wrap:wrap;gap:8px;align-items:center;backdrop-filter:blur(12px)}
+#multi-action-bar .mab-title{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;
+  background:linear-gradient(90deg,var(--gold2),var(--teal2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:4px}
+#multi-action-bar button{display:flex;align-items:center;gap:5px;padding:8px 14px;
+  border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+#multi-action-bar button:hover{transform:translateY(-1px);filter:brightness(1.15)}
+.mab-lineage{background:linear-gradient(135deg,var(--gold3),var(--teal3));color:#fff;box-shadow:0 0 14px rgba(245,166,35,.3)}
+.mab-meta{background:linear-gradient(135deg,var(--teal3),var(--sky));color:#fff;box-shadow:0 0 14px rgba(0,201,177,.25)}
+.mab-src{background:var(--panel2);border:1px solid var(--bdr2)!important;color:var(--t0)}
+.action-bar-btn:hover{transform:translateY(-2px);filter:brightness(1.15)}
+.btn-close{padding:5px 12px;background:var(--panel);border:1px solid var(--bdr2);
+  border-radius:var(--r2);color:var(--t1);font-size:11px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">&#x1F517;</div>
+    <div>
+      <div class="logo-title">DataLineage IQ</div>
+      <div class="logo-sub">Intelligent Lineage &bull; v4.1</div>
+    </div>
+  </div>
+  <div class="api-badge"><div class="live-dot"></div><span id="api-status">Connecting...</span></div>
+</header>
+
+<div class="app">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sb">
+
+  <!-- ── SINGLE UNIFIED SEARCH ── -->
+  <div class="sb-sec">
+    <div class="sb-lbl">&#x1F50D; Search</div>
+    <!-- Hint: one field OR multiple fields comma/newline separated -->
+    <div style="font-size:9px;color:var(--t2);margin-bottom:5px;line-height:1.5">
+      Single field <span style="color:var(--t3)">or</span> multiple fields (comma / one per line)
+    </div>
+    <div class="srch-wrap">
+      <span class="srch-ico">&#x2315;</span>
+      <input id="q" class="srch" type="text" placeholder="TABLE  /  FIELD  /  field1, field2, field3" autocomplete="off"/>
+    </div>
+    <!-- Multi-line mode toggle -->
+    <textarea id="multi-ta" class="multi-ta" rows="3"
+      placeholder="customer_id&#10;acct_num&#10;transaction_ts"
+      style="display:none;margin-top:5px"></textarea>
+    <div style="display:flex;gap:5px;margin-top:6px">
+      <button class="go-btn" id="go-btn" onclick="doUnifiedSearch()" style="flex:1">&#x26A1; DISCOVER LINEAGE</button>
+      <button id="multi-toggle-btn" title="Multi-field mode"
+        onclick="toggleMultiMode()"
+        style="width:32px;height:34px;background:var(--panel);border:1px solid var(--bdr2);
+               border-radius:var(--r2);color:var(--t1);font-size:13px;cursor:pointer;
+               transition:all .15s;flex-shrink:0"
+        >&#x1F500;</button>
+    </div>
+    <!-- Source status pills — always visible below search -->
+    <div id="src-status-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+      <div class="src-pill" id="pill-erwin" title="ERWIN DI: API → Local → Mock">
+        <span class="sp-dot" id="sdot-erwin"></span>&#x1F3DB; ERWIN DI
+      </div>
+      <div class="src-pill" id="pill-dict" title="Data Dictionary: API → Local → Mock">
+        <span class="sp-dot" id="sdot-dict"></span>&#x1F4D6; Dict
+      </div>
+      <div class="src-pill" id="pill-code" title="Code Repo: GitHub → Local → Mock">
+        <span class="sp-dot" id="sdot-code"></span>&#x1F4BB; Code
+      </div>
+      <div class="src-pill" id="pill-tachyon" title="Tachyon AI: LLM summary if reachable">
+        <span class="sp-dot" id="sdot-tachyon"></span>&#x1F916; AI
+      </div>
+    </div>
+  </div>
+
+  <!-- ── QUICK CHIPS ── -->
+  <div class="sb-sec">
+    <div class="sb-lbl">&#x26A1; Quick</div>
+    <div class="chips">
+      <div class="chip" onclick="quickSearch('CUSTOMER')">CUSTOMER</div>
+      <div class="chip" onclick="quickSearch('ORDER_FACT')">ORDER_FACT</div>
+      <div class="chip" onclick="quickSearch('SALES')">SALES</div>
+      <div class="chip" onclick="quickSearch('EMPLOYEE')">EMPLOYEE</div>
+      <div class="chip" onclick="quickSearch('PRODUCT')">PRODUCT</div>
+      <div class="chip" onclick="quickSearch('SALES.REVENUE_AMT')">SALES.REVENUE_AMT</div>
+      <div class="chip" onclick="quickSearch('EMPLOYEE.EMP_ID')">EMPLOYEE.EMP_ID</div>
+      <div class="chip" onclick="quickSearch('ECN_PRIMARY_ID')">ECN_PRIMARY_ID</div>
+      <div class="chip" onclick="quickSearch('FICOSCOREV9SCORE')">FICOSCOREV9SCORE</div>
+      <div class="chip" onclick="quickSearch('RTD_CHECK_MTD_DT')">RTD_CHECK_MTD_DT</div>
+      <div class="chip" onclick="quickSearch('MAC_DELQ')">MAC_DELQ</div>
+    </div>
+  </div>
+
+  <!-- Hidden toggles kept for JS compatibility -->
+  <div style="display:none">
+    <div id="tog-erwin"  class="src-tog on"></div>
+    <div id="tog-dict"   class="src-tog on"></div>
+    <div id="tog-code"   class="src-tog on"></div>
+    <div id="tog-tachyon" class="src-tog on"></div>
+    <div id="chk-erwin">&#x2713;</div>
+    <div id="chk-dict">&#x2713;</div>
+    <div id="chk-code">&#x2713;</div>
+    <div id="chk-tachyon">&#x2713;</div>
+    <div id="dot-erwin"></div>
+    <div id="dot-dict"></div>
+    <div id="dot-code"></div>
+    <div id="dot-tachyon"></div>
+    <div id="ai-sec"></div>
+    <div id="ai-text"></div>
+  </div>
+
+  <div class="sb-sec">
+    <div class="sb-lbl">&#x1F4C2; Upload Inputs</div>
+    <div style="font-size:9px;color:var(--t2);margin-bottom:5px;line-height:1.4">Upload BR xlsx or INPUTS zip</div>
+    <input type="file" id="file-input" accept=".xlsx,.zip" style="display:none" onchange="doUpload(this)"/>
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">&#x1F4C1; Choose File (.xlsx / .zip)</button>
+    <div id="upload-status"></div>
+  </div>
+
+  <div class="sb-sec">
+    <details>
+      <summary>&#x2699;&#xFE0F; Configuration</summary>
+      <div style="margin-top:9px">
+        <div class="cfg-sec">&#x1F3DB; ERWIN DI — Connection</div>
+
+        <!-- ── Shared connection (applies to ALL endpoint calls) ── -->
+        <label class="cfg-lbl">Base URL <span style="color:var(--rose2);font-size:8px">* all endpoints use this</span></label>
+        <input class="cfg-in" id="cf-erwin-url" placeholder="https://lpvra97a0104.wellsfargo.net:4512/erwinDISuite"/>
+        <label class="cfg-lbl">API Key <span style="color:var(--rose2);font-size:8px">* required for live calls</span></label>
+        <input class="cfg-in" id="cf-erwin-key" type="password" placeholder="your-api-key-value"/>
+
+        <!-- ── Default params (auto-filled for endpoints that accept them) ── -->
+        <div style="margin:8px 0 4px;padding:5px 7px;background:rgba(0,201,177,.06);border:1px solid rgba(0,201,177,.15);border-radius:4px;font-size:9px;color:var(--teal2);font-family:'JetBrains Mono',monospace">
+          &#x2139; Default params below are sent automatically to any endpoint that accepts them. Override per-endpoint in the ERWIN APIs tab.
+        </div>
+
+        <label class="cfg-lbl">systemName <span style="color:var(--t3);font-size:8px">used by: datalineage/table, /system, /objects, /mappings...</span></label>
+        <input class="cfg-in" id="cf-erwin-system" placeholder="FNISH"/>
+
+        <label class="cfg-lbl">environmentName <span style="color:var(--t3);font-size:8px">used by: datalineage/table, /column, /objects...</span></label>
+        <input class="cfg-in" id="cf-erwin-env" placeholder="CDS_DCBTDISPUTE"/>
+
+        <label class="cfg-lbl">lineageType <span style="color:var(--t3);font-size:8px">used by: datalineage/table, /column, /system</span></label>
+        <select class="cfg-in" id="cf-erwin-lintype" style="cursor:pointer">
+          <option value="DUAL" selected>DUAL (source + target)</option>
+          <option value="SOURCE">SOURCE only</option>
+          <option value="TARGET">TARGET only</option>
+        </select>
+
+        <label class="cfg-lbl">projectIds <span style="color:var(--t3);font-size:8px">used by: datalineage/table, /system, /tables...</span></label>
+        <input class="cfg-in" id="cf-erwin-project" placeholder="leave blank for all projects"/>
+
+        <!-- ── Per-endpoint overrides section ── -->
+        <div style="margin:10px 0 5px;font-size:9px;font-weight:700;color:var(--gold2);font-family:'JetBrains Mono',monospace;letter-spacing:.5px">PER-ENDPOINT OVERRIDES</div>
+        <div style="font-size:9px;color:var(--t2);margin-bottom:7px;line-height:1.5">
+          These override defaults for specific endpoint types only.
+        </div>
+
+        <!-- datalineage/table override -->
+        <details style="margin-bottom:5px">
+          <summary style="font-size:9px;color:var(--teal2);cursor:pointer;padding:4px 7px;background:var(--panel);border:1px solid var(--bdr);border-radius:4px;list-style:none">
+            &#x25B6; /api/datalineage/table &amp; /system overrides
+          </summary>
+          <div style="padding:7px 0 3px">
+            <label class="cfg-lbl">tableName <span style="color:var(--t3);font-size:8px">(leave blank → use search query)</span></label>
+            <input class="cfg-in" id="cf-ep-tablename" placeholder="e.g. T_DCBMO_DISP_ORIG_ACCT"/>
+          </div>
+        </details>
+
+        <!-- datalineage/column override -->
+        <details style="margin-bottom:5px">
+          <summary style="font-size:9px;color:var(--teal2);cursor:pointer;padding:4px 7px;background:var(--panel);border:1px solid var(--bdr);border-radius:4px;list-style:none">
+            &#x25B6; /api/datalineage/column overrides
+          </summary>
+          <div style="padding:7px 0 3px">
+            <label class="cfg-lbl">columnName <span style="color:var(--t3);font-size:8px">(leave blank → use search query)</span></label>
+            <input class="cfg-in" id="cf-ep-colname" placeholder="e.g. ACCT_NUM"/>
+          </div>
+        </details>
+
+        <!-- objects/search override -->
+        <details style="margin-bottom:5px">
+          <summary style="font-size:9px;color:var(--teal2);cursor:pointer;padding:4px 7px;background:var(--panel);border:1px solid var(--bdr);border-radius:4px;list-style:none">
+            &#x25B6; /api/objects/search overrides
+          </summary>
+          <div style="padding:7px 0 3px">
+            <label class="cfg-lbl">type <span style="color:var(--t3);font-size:8px">(TABLE / COLUMN / MAPPING)</span></label>
+            <select class="cfg-in" id="cf-ep-objtype" style="cursor:pointer">
+              <option value="TABLE" selected>TABLE</option>
+              <option value="COLUMN">COLUMN</option>
+              <option value="MAPPING">MAPPING</option>
+            </select>
+          </div>
+        </details>
+
+        <!-- mappings override -->
+        <details style="margin-bottom:5px">
+          <summary style="font-size:9px;color:var(--teal2);cursor:pointer;padding:4px 7px;background:var(--panel);border:1px solid var(--bdr);border-radius:4px;list-style:none">
+            &#x25B6; /api/mappings overrides
+          </summary>
+          <div style="padding:7px 0 3px">
+            <label class="cfg-lbl">Mapping name filter <span style="color:var(--t3);font-size:8px">(optional)</span></label>
+            <input class="cfg-in" id="cf-ep-mapname" placeholder="e.g. MAP_DISPUTE_LOAD"/>
+          </div>
+        </details>
+
+        <!-- glossary override -->
+        <details style="margin-bottom:5px">
+          <summary style="font-size:9px;color:var(--teal2);cursor:pointer;padding:4px 7px;background:var(--panel);border:1px solid var(--bdr);border-radius:4px;list-style:none">
+            &#x25B6; /api/glossary/terms overrides
+          </summary>
+          <div style="padding:7px 0 3px">
+            <label class="cfg-lbl">Category filter <span style="color:var(--t3);font-size:8px">(optional)</span></label>
+            <input class="cfg-in" id="cf-ep-glosscat" placeholder="e.g. Finance, Customer"/>
+          </div>
+        </details>
+
+        <label class="cfg-lbl" style="margin-top:8px">Local Metadata Dir (fallback)</label>
+        <input class="cfg-in" id="cf-meta" placeholder="./metadata_files"/>
+        <div class="cfg-sec">&#x1F4D6; Data Dictionary</div>
+        <label class="cfg-lbl">Local Dictionary Dir</label>
+        <input class="cfg-in" id="cf-dict" placeholder="./dictionary_files"/>
+        <div class="cfg-sec">&#x1F4BB; Code Repo</div>
+        <label class="cfg-lbl">GitHub Token</label>
+        <input class="cfg-in" id="cf-gh-token" type="password" placeholder="ghp_xxxxx"/>
+        <label class="cfg-lbl">GitHub Repo (owner/repo)</label>
+        <input class="cfg-in" id="cf-gh-repo" placeholder="my-org/data-platform"/>
+        <label class="cfg-lbl">Local Code Dir</label>
+        <input class="cfg-in" id="cf-local" placeholder="./code_repo_samples"/>
+        <div class="cfg-sec">&#x1F916; Tachyon LLM</div>
+        <label class="cfg-lbl">Tachyon API URL</label>
+        <input class="cfg-in" id="cf-tachyon-url" placeholder="http://tachyon-api/v1/chat"/>
+        <label class="cfg-lbl">Tachyon API Key</label>
+        <input class="cfg-in" id="cf-tachyon-key" type="password" placeholder="key..."/>
+      </div>
+    </details>
+  </div>
+
+  <div class="sb-sec" id="recent-sec" style="display:none">
+    <div class="sb-lbl">&#x1F553; Recent</div>
+    <div id="recent-list"></div>
+  </div>
+
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+
+  <!-- Sticky multi-field action bar - shown after multi-search -->
+  <div id="multi-action-bar">
+    <span class="mab-title">&#x1F500; MULTI-FIELD RESULTS</span>
+    <button class="mab-lineage" onclick="showTab('lineage');setTimeout(function(){setLevel('table');},80)">
+      &#x1F578; View Combined Lineage Graph
+    </button>
+    <button class="mab-meta" onclick="showTab('metadata')">
+      &#x1F4CB; View All Metadata
+    </button>
+    <button class="mab-src" onclick="showTab('sources')">
+      &#x1F4E1; View Sources
+    </button>
+    <span id="mab-stats" style="margin-left:auto;font-size:10px;color:var(--t2);font-family:'JetBrains Mono',monospace"></span>
+  </div>
+
+  <div class="top-bar" id="top-bar" style="display:none">
+    <div class="res-bar">
+      <div class="res-title" id="res-title">Results</div>
+      <div id="stat-pills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      <div class="exp-row" id="exp-row" style="display:none">
+        <button class="exp-btn exp-xl" onclick="doExportExcel()">&#x1F4CA; Excel</button>
+        <button class="exp-btn exp-js" onclick="doExportJSON()">&#x1F4E6; JSON</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn on" id="tb-lineage"  onclick="showTab('lineage')">&#x1F578; Lineage</button>
+      <button class="tab-btn"    id="tb-metadata" onclick="showTab('metadata')">&#x1F4CB; Metadata</button>
+      <button class="tab-btn"    id="tb-sources"  onclick="showTab('sources')">&#x1F4E1; Sources</button>
+      <button class="tab-btn"    id="tb-multi"    onclick="showTab('multi')">&#x1F500; Multi-Field</button>
+      <button class="tab-btn"    id="tb-erwin"    onclick="showTab('erwin')">&#x1F3DB; ERWIN APIs</button>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+
+    <!-- Empty state -->
+    <div class="empty" id="st-empty">
+      <div class="empty-icon">&#x1F517;</div>
+      <div class="empty-title">DataLineage IQ</div>
+      <div class="empty-desc">Discover complete end-to-end data lineage. ERWIN DI, Data Dictionary, Code Repos &amp; Tachyon AI &mdash; all in one platform.</div>
+      <div class="cta-row">
+        <div class="chip" onclick="setQ('CUSTOMER');doSearch()">&#x25B6; Run CUSTOMER</div>
+        <div class="chip" onclick="setQ('SALES.REVENUE_AMT');doSearch()">&#x25B6; Run SALES.REVENUE_AMT</div>
+        <div class="chip" onclick="setQ('ECN_PRIMARY_ID');doSearch()">&#x25B6; Run ECN_PRIMARY_ID</div>
+      </div>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading" id="st-loading">
+      <div class="ring"></div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:2px;background:linear-gradient(90deg,var(--gold2),var(--teal2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Discovering Lineage...</div>
+      <div class="ld-steps">
+        <div class="ld-step" id="ld-erwin">&#x1F3DB; ERWIN DI &mdash; API &rarr; local fallback</div>
+        <div class="ld-step" id="ld-dict">&#x1F4D6; Data Dictionary &mdash; API &rarr; local fallback</div>
+        <div class="ld-step" id="ld-code">&#x1F4BB; Code Repository &mdash; GitHub &rarr; local scan</div>
+        <div class="ld-step" id="ld-tachyon">&#x1F916; Tachyon AI enrichment</div>
+        <div class="ld-step" id="ld-graph">&#x1F578; Building lineage graph</div>
+      </div>
+    </div>
+
+    <!-- ── TACHYON AI — TRIGGER BUTTON (always visible after search) ── -->
+    <div id="ai-trigger-row" style="display:none;margin-bottom:14px">
+      <button id="ai-trigger-btn" onclick="generateAISummary()"
+        style="display:flex;align-items:center;gap:10px;width:100%;padding:13px 18px;
+          background:linear-gradient(135deg,rgba(155,109,255,.12),rgba(0,201,177,.08));
+          border:1px solid rgba(155,109,255,.28);border-radius:var(--r);cursor:pointer;
+          transition:all .25s;text-align:left;position:relative;overflow:hidden">
+        <!-- Animated shimmer line -->
+        <div style="position:absolute;top:0;left:-100%;width:100%;height:2px;
+          background:linear-gradient(90deg,transparent,rgba(155,109,255,.6),transparent);
+          animation:shimmer 2.5s ease-in-out infinite"></div>
+        <!-- Icon -->
+        <div style="width:36px;height:36px;border-radius:9px;flex-shrink:0;
+          background:linear-gradient(135deg,rgba(155,109,255,.25),rgba(0,201,177,.2));
+          border:1px solid rgba(155,109,255,.35);display:flex;align-items:center;
+          justify-content:center;font-size:16px">&#x1F916;</div>
+        <!-- Text -->
+        <div style="flex:1">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1.5px;
+            background:linear-gradient(90deg,var(--vio2),var(--teal2));
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent">
+            Generate AI Process Summary
+          </div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px;font-family:'JetBrains Mono',monospace">
+            Tachyon LLM • Source → ETL → Target • Risk analysis • Full data flow
+          </div>
+        </div>
+        <!-- Arrow -->
+        <div style="font-size:18px;color:var(--vio2);opacity:.7;transition:transform .2s" id="ai-btn-arrow">&#x2192;</div>
+      </button>
+    </div>
+
+    <!-- ── TACHYON AI SUMMARY PANEL (shown only after clicking Generate) ── -->
+    <div id="ai-summary-box" style="display:none;margin-bottom:14px">
+
+      <!-- Header bar -->
+      <div style="display:flex;align-items:center;gap:10px;padding:14px 18px 0;
+        background:linear-gradient(135deg,rgba(155,109,255,.1),rgba(0,201,177,.06));
+        border:1px solid rgba(155,109,255,.25);border-radius:var(--r) var(--r) 0 0;
+        border-bottom:none;position:relative;overflow:hidden">
+        <!-- Top accent line -->
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;
+          background:linear-gradient(90deg,var(--vio),var(--teal),var(--sky))"></div>
+        <!-- Icon glow circle -->
+        <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;
+          background:linear-gradient(135deg,rgba(155,109,255,.3),rgba(0,201,177,.2));
+          border:1px solid rgba(155,109,255,.4);display:flex;align-items:center;
+          justify-content:center;font-size:18px;
+          box-shadow:0 0 20px rgba(155,109,255,.25)">&#x1F916;</div>
+        <div style="flex:1">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;
+            background:linear-gradient(90deg,var(--vio2),var(--teal2));
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent">
+            Tachyon AI — Process Summary
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+            <span id="ai-sum-badge" style="font-size:8px;font-weight:700;padding:2px 8px;
+              border-radius:10px;background:rgba(155,109,255,.15);color:var(--vio2);
+              border:1px solid rgba(155,109,255,.25);font-family:'JetBrains Mono',monospace">
+              STRUCTURAL SUMMARY
+            </span>
+            <span id="ai-sum-status" style="font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace"></span>
+          </div>
+        </div>
+        <button onclick="closeAISummary()"
+          style="width:26px;height:26px;border-radius:6px;border:1px solid var(--bdr2);
+            background:var(--panel);color:var(--t1);cursor:pointer;font-size:12px;
+            display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0">&#x2715;</button>
+      </div>
+
+      <!-- 4-card grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;
+        background:rgba(155,109,255,.15);border:1px solid rgba(155,109,255,.2);border-top:none">
+
+        <div style="background:var(--bg2);padding:13px 15px">
+          <div style="font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+            letter-spacing:.7px;margin-bottom:8px;font-family:'JetBrains Mono',monospace;
+            display:flex;align-items:center;gap:5px">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--lime);display:inline-block"></span>
+            Source Systems
+          </div>
+          <div id="ai-sum-sources" style="font-size:11px;color:var(--t0);line-height:1.6">—</div>
+        </div>
+
+        <div style="background:var(--bg2);padding:13px 15px">
+          <div style="font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+            letter-spacing:.7px;margin-bottom:8px;font-family:'JetBrains Mono',monospace;
+            display:flex;align-items:center;gap:5px">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--sky);display:inline-block"></span>
+            Target Systems
+          </div>
+          <div id="ai-sum-targets" style="font-size:11px;color:var(--t0);line-height:1.6">—</div>
+        </div>
+
+        <div style="background:var(--bg2);padding:13px 15px">
+          <div style="font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+            letter-spacing:.7px;margin-bottom:8px;font-family:'JetBrains Mono',monospace;
+            display:flex;align-items:center;gap:5px">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block"></span>
+            ETL / Transform
+          </div>
+          <div id="ai-sum-transform" style="font-size:11px;color:var(--t0);line-height:1.6">—</div>
+        </div>
+
+        <div style="background:var(--bg2);padding:13px 15px">
+          <div style="font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+            letter-spacing:.7px;margin-bottom:8px;font-family:'JetBrains Mono',monospace;
+            display:flex;align-items:center;gap:5px">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--rose);display:inline-block"></span>
+            Risk &amp; Classification
+          </div>
+          <div id="ai-sum-risk" style="font-size:11px;color:var(--t0);line-height:1.6">—</div>
+        </div>
+      </div>
+
+      <!-- Insight narrative -->
+      <div style="background:linear-gradient(135deg,rgba(155,109,255,.06),rgba(0,201,177,.04));
+        border:1px solid rgba(155,109,255,.18);border-top:none;padding:14px 16px;
+        border-radius:0 0 var(--r) var(--r)">
+        <div style="font-size:8px;font-weight:700;color:var(--vio2);text-transform:uppercase;
+          letter-spacing:.7px;margin-bottom:7px;font-family:'JetBrains Mono',monospace">
+          &#x2728; AI Insight
+        </div>
+        <div id="ai-sum-insight" style="font-size:12px;color:var(--t1);line-height:1.7;font-style:italic"></div>
+
+        <!-- Data flow strip -->
+        <div id="ai-sum-flow" style="margin-top:12px;display:none;padding-top:11px;
+          border-top:1px solid rgba(155,109,255,.12)">
+          <div style="font-size:8px;font-weight:700;color:var(--t2);text-transform:uppercase;
+            letter-spacing:.7px;margin-bottom:7px;font-family:'JetBrains Mono',monospace">
+            Complete Data Flow
+          </div>
+          <div id="ai-sum-flow-content" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
+        <!-- Tachyon CTA if not configured -->
+        <div id="ai-sum-cta" style="display:none;margin-top:10px;padding:8px 11px;
+          background:rgba(155,109,255,.06);border-radius:5px;border:1px dashed rgba(155,109,255,.2)">
+          <div style="font-size:10px;color:var(--vio2)">
+            &#x1F916; Configure Tachyon AI URL in Configuration → Tachyon LLM for richer, context-aware insights.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lineage pane -->
+    <div id="pane-lineage" style="display:none">
+      <div class="ctrl-row">
+        <div class="lv-bar">
+          <button class="lv-btn on" id="lv-system" onclick="setLevel('system')">&#x1F3E2; System</button>
+          <button class="lv-btn"    id="lv-table"  onclick="setLevel('table')">&#x1F5C3; Table</button>
+          <button class="lv-btn"    id="lv-field"  onclick="setLevel('field')">&#x1F532; Field</button>
+        </div>
+        <div class="bc" id="bc"></div>
+        <div style="flex:1"></div>
+        <span style="font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace">View:</span>
+        <div class="view-tog">
+          <button class="vt-btn on" id="vt-erd"   onclick="setView('erd')">&#x25A6; ERD Flow</button>
+          <button class="vt-btn"    id="vt-force" onclick="setView('force')">&#x25C9; Force</button>
+        </div>
+      </div>
+      <div class="gbox">
+        <div class="g-hdr">
+          <div><div class="g-title" id="g-title">Lineage Graph</div><div class="g-sub" id="g-sub"></div></div>
+          <div class="g-tools">
+            <div class="g-btn" onclick="gZoomIn()" title="Zoom In">+</div>
+            <div class="g-btn" onclick="gZoomOut()" title="Zoom Out">&minus;</div>
+            <div class="g-btn" onclick="gFit()" title="Fit">&#x229F;</div>
+            <div class="g-btn" onclick="gFullscreen()" title="Fullscreen">&#x26F6;</div>
+          </div>
+        </div>
+        <div id="erd-view">
+          <div id="erd-pan" style="width:100%;height:100%;position:absolute">
+            <div id="erd-world" style="position:absolute;transform-origin:0 0">
+              <div id="erd-host"></div>
+              <svg id="erd-svg"></svg>
+            </div>
+          </div>
+        </div>
+        <div id="force-view" style="display:none;height:490px">
+          <svg id="force-svg" style="width:100%;height:490px"></svg>
+        </div>
+        <div class="g-legend" id="g-legend"></div>
+      </div>
+      <div class="lv-cards">
+        <div class="lv-card" onclick="setLevel('system')">
+          <div class="lv-card-icon">&#x1F3E2;</div>
+          <div class="lv-card-name">System Level</div>
+          <div class="lv-card-desc">Cross-system lineage from source platforms to data warehouse</div>
+        </div>
+        <div class="lv-card" onclick="setLevel('table')">
+          <div class="lv-card-icon">&#x1F5C3;</div>
+          <div class="lv-card-name">Table Level</div>
+          <div class="lv-card-desc">Table-to-table flow with ETL transformations</div>
+        </div>
+        <div class="lv-card" onclick="setLevel('field')">
+          <div class="lv-card-icon">&#x1F532;</div>
+          <div class="lv-card-name">Field Level</div>
+          <div class="lv-card-desc">Column-to-column mapping with business rules</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metadata pane -->
+    <div id="pane-metadata" style="display:none">
+      <div style="font-size:10px;color:var(--t2);margin-bottom:8px;font-family:'JetBrains Mono',monospace" id="meta-count"></div>
+      <div class="meta-grid">
+        <div><div class="meta-tbl" id="meta-tbl"></div></div>
+        <div class="fdetail" id="fdetail">
+          <div style="padding:38px;text-align:center;color:var(--t2)">
+            <div style="font-size:30px;margin-bottom:10px;filter:drop-shadow(0 0 10px rgba(245,166,35,.35))">&#x261D;</div>
+            <div style="font-size:12px;font-weight:600">Select a field to view details</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:5px">Risk &bull; Logic &bull; Lineage &bull; Impact &bull; PDF</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sources pane -->
+    <div id="pane-sources" style="display:none">
+      <div class="src-cards" id="src-cards"></div>
+    </div>
+
+    <!-- ERWIN API Explorer pane -->
+    <div id="pane-erwin" style="display:none">
+
+      <!-- Header bar -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;
+          background:linear-gradient(90deg,var(--gold2),var(--teal2));
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent">
+          ERWIN DI API Explorer
+        </div>
+        <span id="erwin-ep-count" style="font-size:10px;color:var(--t2);
+          font-family:'JetBrains Mono',monospace"></span>
+        <button onclick="loadErwinEndpoints()"
+          style="padding:5px 12px;background:linear-gradient(135deg,var(--gold3),var(--teal3));
+            border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:700;cursor:pointer">
+          &#x27F3; Refresh Endpoints
+        </button>
+        <button onclick="loadErwinSwagger()"
+          style="padding:5px 12px;background:var(--panel);border:1px solid var(--bdr2);
+            border-radius:6px;color:var(--t1);font-size:11px;font-weight:700;cursor:pointer">
+          &#x1F4CB; View Swagger Spec
+        </button>
+      </div>
+
+      <!-- Quick call builder -->
+      <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);
+        padding:14px;margin-bottom:14px;box-shadow:var(--sh2)">
+        <div style="font-size:10px;font-weight:700;color:var(--gold2);letter-spacing:.5px;
+          font-family:'JetBrains Mono',monospace;margin-bottom:10px">
+          &#x26A1; QUICK ENDPOINT CALLER
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace;display:block;margin-bottom:3px">Endpoint Path</label>
+            <select id="erwin-ep-select" class="cfg-in" style="width:100%;cursor:pointer"
+              onchange="onErwinEpSelect(this.value)">
+              <option value="">-- Select endpoint --</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace;display:block;margin-bottom:3px">Description</label>
+            <div id="erwin-ep-desc" style="font-size:10px;color:var(--teal2);
+              background:var(--panel);border:1px solid var(--bdr);border-radius:var(--r3);
+              padding:5px 8px;height:26px;overflow:hidden;font-family:'JetBrains Mono',monospace">
+              Select an endpoint above
+            </div>
+          </div>
+        </div>
+        <div id="erwin-param-builder" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:7px">
+          <button onclick="callErwinEndpoint()"
+            style="flex:1;height:30px;background:linear-gradient(135deg,var(--gold3),var(--teal3));
+              border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+            &#x25B6; Call Endpoint
+          </button>
+          <button onclick="callAndSearch()"
+            style="flex:1;height:30px;background:linear-gradient(135deg,var(--teal3),var(--sky));
+              border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+            &#x1F578; Call + Show Lineage
+          </button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="erwin-call-result" style="display:none;background:var(--bg2);
+        border:1px solid var(--bdr2);border-radius:var(--r);padding:14px;
+        margin-bottom:14px;box-shadow:var(--sh2)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div id="erwin-result-status" style="font-size:10px;font-family:'JetBrains Mono',monospace"></div>
+          <div id="erwin-result-endpoint" style="font-size:9px;color:var(--t2);font-family:'JetBrains Mono',monospace"></div>
+        </div>
+        <pre id="erwin-result-json" style="background:rgba(0,0,0,.45);border:1px solid var(--bdr2);
+          border-radius:4px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:9px;
+          color:var(--teal2);overflow:auto;max-height:320px;line-height:1.5;
+          border-left:2px solid var(--gold);white-space:pre-wrap;word-break:break-all"></pre>
+      </div>
+
+      <!-- Endpoint catalog -->
+      <div style="font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.5px;
+        font-family:'JetBrains Mono',monospace;margin-bottom:8px">
+        ALL AVAILABLE ENDPOINTS
+      </div>
+      <div id="erwin-ep-list"></div>
+
+    </div>
+
+    <!-- Multi pane -->
+    <div id="pane-multi" style="display:none">
+
+      <!-- STATIC ACTION BAR — always visible, no JS needed to render -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;padding:12px 0;border-bottom:2px solid rgba(245,166,35,.25)">
+        <button onclick="showTab('lineage');setTimeout(function(){setLevel('table');},80)"
+          style="display:flex;align-items:center;gap:7px;padding:10px 18px;
+            background:linear-gradient(135deg,#B8780A,#008F7E);
+            border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;
+            cursor:pointer;box-shadow:0 0 18px rgba(245,166,35,.35);
+            letter-spacing:.3px;transition:all .2s"
+          onmouseover="this.style.transform='translateY(-2px)'"
+          onmouseout="this.style.transform='translateY(0)'">
+          &#x1F578; View Combined Lineage Graph
+        </button>
+        <button onclick="showTab('metadata')"
+          style="display:flex;align-items:center;gap:7px;padding:10px 18px;
+            background:linear-gradient(135deg,#008F7E,#1d6fa6);
+            border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;
+            cursor:pointer;box-shadow:0 0 18px rgba(0,201,177,.3);
+            letter-spacing:.3px;transition:all .2s"
+          onmouseover="this.style.transform='translateY(-2px)'"
+          onmouseout="this.style.transform='translateY(0)'">
+          &#x1F4CB; View All Metadata
+        </button>
+        <button onclick="showTab('sources')"
+          style="display:flex;align-items:center;gap:7px;padding:10px 18px;
+            background:rgba(255,255,255,.07);
+            border:1px solid rgba(255,255,255,.15);border-radius:7px;color:#F2F8FF;
+            font-size:13px;font-weight:700;cursor:pointer;
+            letter-spacing:.3px;transition:all .2s"
+          onmouseover="this.style.transform='translateY(-2px)'"
+          onmouseout="this.style.transform='translateY(0)'">
+          &#x1F4E1; View Sources
+        </button>
+        <span id="multi-summary" style="margin-left:auto;font-size:10px;color:#4E6E8A;
+          font-family:'JetBrains Mono',monospace;display:flex;align-items:center"></span>
+      </div>
+
+      <div id="multi-results"></div>
+
+      <!-- BOTTOM ACTION BAR — always visible when scrolled down -->
+      <div id="multi-bottom-bar" style="display:none;gap:8px;margin-top:14px;flex-wrap:wrap;
+        padding-top:12px;border-top:2px solid rgba(245,166,35,.25)">
+        <button onclick="showTab('lineage');setTimeout(function(){setLevel('table');},80)"
+          style="display:flex;align-items:center;gap:7px;padding:10px 18px;
+            background:linear-gradient(135deg,#B8780A,#008F7E);
+            border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;
+            cursor:pointer;box-shadow:0 0 18px rgba(245,166,35,.35);letter-spacing:.3px">
+          &#x1F578; View Combined Lineage Graph
+        </button>
+        <button onclick="showTab('metadata')"
+          style="display:flex;align-items:center;gap:7px;padding:10px 18px;
+            background:linear-gradient(135deg,#008F7E,#1d6fa6);
+            border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;
+            cursor:pointer;box-shadow:0 0 18px rgba(0,201,177,.3);letter-spacing:.3px">
+          &#x1F4CB; View All Metadata
+        </button>
+      </div>
+
+    </div>
+
+  </div><!-- content -->
+</div><!-- main -->
+</div><!-- app -->
+
+<!-- Modal -->
+<div class="overlay" id="overlay" onclick="closeOverlay(event)">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">Details</div>
+      <button class="modal-x" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot"><button class="btn-close" onclick="closeModal()">Close</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ── STATE ──────────────────────────────────────────────────────────────────────
+const API = '';
+let D = null;
+let curLevel = 'system';
+let curView  = 'erd';
+let selField = null;
+let hist = [];
+let srcs = {erwin:true, dict:true, code:true, tachyon:true};
+let erdScale = 1, erdX = 20, erdY = 20, erdDragging = false, erdDragStart = {x:0,y:0};
+let nodePositions = {};
+let fSvg = null, fZoom = null, fG = null;
+
+// ── HELPERS ────────────────────────────────────────────────────────────────────
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function gv(id){ const el=document.getElementById(id); return el ? el.value : ''; }
+function sv(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+function el(id){ return document.getElementById(id); }
+function show(id){ const e=el(id); if(e) e.style.display='block'; }
+function hide(id){ const e=el(id); if(e) e.style.display='none'; }
+
+function toast(msg, type){
+  const t=el('toast');
+  const bc={info:'var(--sky)',success:'var(--lime)',error:'var(--rose)',warn:'var(--gold)'};
+  t.style.borderLeftColor = bc[type]||bc.info;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+function fr(k,v){
+  return '<div class="fd-row"><span class="fd-k">'+k+'</span><span class="fd-v">'+v+'</span></div>';
+}
+
+function confBadge(c){
+  const cls = c==='PII-Restricted'?'conf-pii-r' : c==='PII-Confidential'?'conf-pii-c' :
+              c==='Confidential'?'conf-conf'    : c==='Public'?'conf-pub' : 'conf-int';
+  return '<span class="conf-pill '+cls+'">'+esc(c)+'</span>';
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+(async function init(){
+  try{
+    const r = await fetch(API+'/api/health');
+    if(r.ok){
+      const d = await r.json();
+      el('api-status').textContent = 'v'+d.version+' Connected \u2713';
+    } else {
+      el('api-status').textContent = 'Mock Mode';
+    }
+  } catch(e){
+    el('api-status').textContent = 'Mock Mode';
+  }
+  try{
+    const r = await fetch(API+'/api/config');
+    if(r.ok){
+      const c = await r.json();
+      if(c.LOCAL_META_DIR && c.LOCAL_META_DIR!=='./metadata_files') sv('cf-meta', c.LOCAL_META_DIR);
+      if(c.LOCAL_DICT_DIR && c.LOCAL_DICT_DIR!=='./dictionary_files') sv('cf-dict', c.LOCAL_DICT_DIR);
+      if(c.LOCAL_CODE_DIR && c.LOCAL_CODE_DIR!=='./code_repo_samples') sv('cf-local', c.LOCAL_CODE_DIR);
+      if(c.GITHUB_REPO) sv('cf-gh-repo', c.GITHUB_REPO);
+      if(c.TACHYON_URL) sv('cf-tachyon-url', c.TACHYON_URL);
+      // Pre-fill ERWIN fields from server config (set in START_APP.bat)
+      if(c.ERWIN_BASE_URL && c.ERWIN_BASE_URL!=='http://erwin-di-host/erwin-di/api')
+        sv('cf-erwin-url', c.ERWIN_BASE_URL);
+      if(c.ERWIN_SYSTEM)  sv('cf-erwin-system',  c.ERWIN_SYSTEM);
+      if(c.ERWIN_ENV)     sv('cf-erwin-env',     c.ERWIN_ENV);
+      if(c.ERWIN_PROJECT) sv('cf-erwin-project', c.ERWIN_PROJECT);
+    }
+  } catch(e){}
+})();
+
+el('q').addEventListener('keydown', function(e){ if(e.key==='Enter') doUnifiedSearch(); });
+
+function setQ(q){ el('q').value=q; el('q').focus(); }
+
+function quickSearch(q){
+  el('q').value=q;
+  // hide multi-ta if visible
+  var ta=el('multi-ta'); if(ta) ta.style.display='none';
+  doUnifiedSearch();
+}
+
+var _multiMode = false;
+function toggleMultiMode(){
+  _multiMode = !_multiMode;
+  var ta  = el('multi-ta');
+  var inp = el('q');
+  var btn = el('multi-toggle-btn');
+  if(_multiMode){
+    ta.style.display  = 'block';
+    inp.style.display = 'none';
+    btn.style.background = 'linear-gradient(135deg,var(--teal3),var(--sky))';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'transparent';
+    ta.focus();
+  } else {
+    ta.style.display  = 'none';
+    inp.style.display = 'block';
+    btn.style.background = 'var(--panel)';
+    btn.style.color = 'var(--t1)';
+    btn.style.borderColor = 'var(--bdr2)';
+    inp.focus();
+  }
+}
+
+// Unified entry point — detects single vs multi automatically
+async function doUnifiedSearch(){
+  if(_multiMode){
+    // Multi-field mode
+    doMultiSearch();
+    return;
+  }
+  var raw = el('q').value.trim();
+  if(!raw){ toast('Enter a table, field or comma-separated list','warn'); return; }
+  // Detect if comma-separated or multi-word — treat as multi-field
+  var fields = raw.split(/[\n\r,]+/).map(function(f){return f.trim();}).filter(Boolean);
+  if(fields.length > 1){
+    // Auto-fill multi textarea and run multi search
+    el('multi-ta').value = fields.join('\n');
+    doMultiSearch();
+  } else {
+    doSearch();
+  }
+}
+
+function toggleSrc(s){
+  srcs[s] = !srcs[s];
+  el('tog-'+s).classList.toggle('on', srcs[s]);
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────────────────────
+async function doSearch(){
+  const q = el('q').value.trim();
+  if(!q){ toast('Enter a search term','warn'); return; }
+
+  // Hide all state panes
+  hide('st-empty');
+  hideAllPanes();
+  show('st-loading');
+  hide('top-bar');
+  var aib=el('ai-summary-box'); if(aib) aib.style.display='none';
+  var atr=el('ai-trigger-row'); if(atr) atr.style.display='none';
+  el('go-btn').disabled = true;
+  el('multi-action-bar').style.display = 'none';
+  animLoadSteps();
+
+  try{
+    const body = {
+      query:          q,
+      use_erwin:      srcs.erwin,
+      use_data_dict:  srcs.dict,
+      use_code_repo:  srcs.code,
+      use_tachyon:    srcs.tachyon,
+      // ERWIN DI — shared connection (used by ALL endpoints)
+      erwin_base_url:     gv('cf-erwin-url')      || null,
+      erwin_api_key:      gv('cf-erwin-key')      || null,
+      // ERWIN DI — default params (auto-filled for any endpoint that accepts them)
+      erwin_system:       gv('cf-erwin-system')   || null,
+      erwin_env:          gv('cf-erwin-env')       || null,
+      erwin_project:      gv('cf-erwin-project')  || null,
+      erwin_lineage_type: gv('cf-erwin-lintype')  || 'DUAL',
+      // ERWIN DI — per-endpoint overrides
+      erwin_ep_tablename: gv('cf-ep-tablename')   || null,
+      erwin_ep_colname:   gv('cf-ep-colname')     || null,
+      erwin_ep_objtype:   gv('cf-ep-objtype')     || 'TABLE',
+      erwin_ep_mapname:   gv('cf-ep-mapname')     || null,
+      erwin_ep_glosscat:  gv('cf-ep-glosscat')    || null,
+      // Other source params
+      github_token:   gv('cf-gh-token')    || null,
+      github_repo:    gv('cf-gh-repo')     || null,
+      local_code_dir: gv('cf-local')       || null,
+      local_meta_dir: gv('cf-meta')        || null,
+      local_dict_dir: gv('cf-dict')        || null,
+      tachyon_url:    gv('cf-tachyon-url') || null,
+      tachyon_key:    gv('cf-tachyon-key') || null,
+    };
+    const r = await fetch(API+'/api/search', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!r.ok) throw new Error(await r.text());
+    D = await r.json();
+    if(!hist.includes(q)){ hist.unshift(q); hist=hist.slice(0,6); renderRecent(); }
+    renderAll(D);
+  } catch(e){
+    toast('Error: '+e.message, 'error');
+    show('st-empty');
+  } finally{
+    hide('st-loading');
+    el('go-btn').disabled = false;
+  }
+}
+
+function animLoadSteps(){
+  ['erwin','dict','code','tachyon','graph'].forEach(function(s, i){
+    const e = el('ld-'+s);
+    if(!e) return;
+    e.classList.remove('active','done');
+    setTimeout(function(){ e.classList.add('active'); }, i*390);
+    setTimeout(function(){ e.classList.remove('active'); e.classList.add('done'); }, i*390+580);
+  });
+}
+
+function updateSrcPills(sourcesUsed){
+  var map = {'ERWIN DI':'erwin','Data Dictionary':'dict','Code Repo':'code','Tachyon AI':'tachyon'};
+  Object.keys(map).forEach(function(name){
+    var key = map[name];
+    var pill = el('pill-'+key);
+    var dot  = el('sdot-'+key);
+    if(!pill) return;
+    var match = sourcesUsed.find(function(s){ return s.includes(name); })||'';
+    pill.className='src-pill';
+    if(match.includes('LIVE')||match.includes('GITHUB')){
+      pill.classList.add('live');
+    } else if(match.includes('LOCAL')||match.includes('FILE')||match.includes('EXCEL')){
+      pill.classList.add('file');
+    } else if(match.includes('LLM')||match.includes('AI')){
+      pill.classList.add('active');
+    } else {
+      pill.classList.add('mock');
+    }
+  });
+}
+
+// Store last D for when user clicks Generate
+var _lastSearchData = null;
+
+function renderAISummaryBox(d){
+  _lastSearchData = d;
+  var box = el('ai-summary-box');
+  var trig = el('ai-trigger-row');
+  if(!box || !trig) return;
+
+  // Hide the expanded box — only show trigger button
+  box.style.display = 'none';
+
+  // Show trigger row if there is graph data
+  var nodes = d.nodes||[];
+  if(nodes.length === 0){ trig.style.display='none'; return; }
+  trig.style.display = 'block';
+
+  // Reset button state
+  var btn = el('ai-trigger-btn');
+  if(btn){
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.querySelector('div:last-child').innerHTML = '&#x2192;';
+  }
+}
+
+function closeAISummary(){
+  var box = el('ai-summary-box');
+  var trig = el('ai-trigger-row');
+  if(box) box.style.display='none';
+  if(trig) trig.style.display='block';
+}
+
+async function generateAISummary(){
+  var d = _lastSearchData;
+  if(!d) return;
+
+  var btn = el('ai-trigger-btn');
+  // Show loading state on button
+  if(btn){
+    btn.disabled = true;
+    btn.style.opacity = '.7';
+    btn.querySelector('div:last-child').innerHTML = '<span style="font-size:14px;animation:spin .6s linear infinite;display:inline-block">&#x21BB;</span>';
+  }
+
+  // If Tachyon configured — call the API for real AI summary
+  var tachyonUrl = gv('cf-tachyon-url');
+  if(tachyonUrl && d.nodes && d.nodes.length){
+    try{
+      var r = await fetch('/api/search', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          query: d.query, use_tachyon: true,
+          use_erwin: false, use_data_dict: false, use_code_repo: false,
+          tachyon_url: tachyonUrl, tachyon_key: gv('cf-tachyon-key')
+        })
+      });
+      if(r.ok){
+        var fresh = await r.json();
+        if(fresh.ai_insights) d = Object.assign({}, d, {ai_insights: fresh.ai_insights});
+      }
+    } catch(e){}
+  }
+
+  _fillAISummaryBox(d);
+}
+
+function _fillAISummaryBox(d){
+  var box  = el('ai-summary-box');
+  var trig = el('ai-trigger-row');
+  if(!box) return;
+
+  // Build structured summary from graph data
+  var nodes   = d.nodes||[];
+  var meta    = d.metadata||[];
+  var sources = [...new Set(nodes.filter(function(n){return n.type==='source_table';}).map(function(n){return n.system||n.label;}))];
+  var targets = [...new Set(nodes.filter(function(n){return n.type==='target_table';}).map(function(n){return n.system||n.label;}))];
+  var trfs    = nodes.filter(function(n){return n.type==='transformation';}).map(function(n){return n.label;});
+  var highRisk= meta.filter(function(m){return m.risk_level==='High';}).length;
+  var pii     = meta.filter(function(m){return (m.confidentiality||'').includes('PII');}).length;
+
+  if(sources.length===0 && targets.length===0) { if(box) box.style.display='none'; return; }
+
+  // Show summary box, hide trigger
+  if(box) box.style.display='block';
+  if(trig) trig.style.display='none';
+
+  // Fill structured cards
+  el('ai-sum-sources').innerHTML   = sources.length ? sources.map(function(s){return '<span class="dtype" style="font-size:9px">'+esc(s)+'</span>';}).join(' ') : '—';
+  el('ai-sum-targets').innerHTML   = targets.length ? targets.map(function(s){return '<span class="dtype" style="font-size:9px;border-color:rgba(59,158,255,.2);color:var(--sky2)">'+esc(s)+'</span>';}).join(' ') : '—';
+  el('ai-sum-transform').innerHTML = trfs.length ? trfs.slice(0,2).map(function(t){return '<span class="dtype" style="font-size:9px;border-color:rgba(245,166,35,.2);color:var(--gold2)">'+esc(t.replace('\n',' ').slice(0,30))+'</span>';}).join(' ') : '<span style="color:var(--t3)">Direct mapping</span>';
+  el('ai-sum-risk').innerHTML      = '<span class="rb rb-H" style="font-size:9px">'+highRisk+' High</span> &nbsp;<span style="font-size:9px;color:var(--t2)">'+pii+' PII fields</span>';
+
+  // Data flow strip
+  var flowContent = el('ai-sum-flow-content');
+  if(flowContent && nodes.length>0){
+    var flowNodes = [];
+    nodes.forEach(function(n){
+      if(n.type==='source_table') flowNodes.unshift(n);
+      else if(n.type==='target_table') flowNodes.push(n);
+      else flowNodes.splice(Math.floor(flowNodes.length/2),0,n);
+    });
+    flowContent.innerHTML = flowNodes.slice(0,6).map(function(n,i){
+      var cls = n.type==='source_table'?'lf-src':n.type==='target_table'?'lf-tgt':'';
+      var arr = i<Math.min(flowNodes.length,6)-1?'<span class="lf-arr">&rarr;</span>':'';
+      return '<span class="lf-n '+cls+'" style="font-size:9px">'+esc((n.label||'').replace('\n',' ').slice(0,22))+'</span>'+arr;
+    }).join('');
+    el('ai-sum-flow').style.display='block';
+  }
+
+  // If Tachyon responded — show richer insight; else show structural summary
+  if(d.ai_insights){
+    el('ai-sum-insight').textContent = d.ai_insights;
+    el('ai-sum-status').textContent  = '&#x1F7E2; Tachyon AI Live';
+    el('ai-sum-badge').textContent   = 'TACHYON AI';
+  } else {
+    // Auto-generated structural summary from graph
+    var summary = 'Data flows from ';
+    if(sources.length) summary += sources.slice(0,2).join(' & ');
+    else summary += 'source systems';
+    if(trfs.length) summary += ' through ' + trfs.slice(0,1).join(', ');
+    if(targets.length) summary += ' into ' + targets.slice(0,2).join(' & ');
+    summary += '. Found '+meta.length+' field'+(meta.length!==1?'s':'')+' across '+nodes.length+' objects';
+    if(highRisk>0) summary += ', including '+highRisk+' high-risk field'+(highRisk>1?'s':'');
+    if(pii>0) summary += ' and '+pii+' PII-classified field'+(pii>1?'s':'');
+    summary += '.';
+    var insEl = el('ai-sum-insight');
+    if(insEl){ insEl.textContent = summary; insEl.classList.add('ai-typing'); }
+    var statEl = el('ai-sum-status');
+    if(statEl) statEl.textContent = 'Auto-generated (Tachyon not configured)';
+    var badgeEl = el('ai-sum-badge');
+    if(badgeEl) badgeEl.textContent = 'STRUCTURAL SUMMARY';
+    var ctaEl = el('ai-sum-cta');
+    if(ctaEl) ctaEl.style.display = gv('cf-tachyon-url') ? 'none' : 'block';
+  }
+  // Reset button
+  var btn = el('ai-trigger-btn');
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; }
+}
+
+function renderRecent(){
+  el('recent-sec').style.display = 'block';
+  el('recent-list').innerHTML = hist.map(function(h){
+    return '<div class="recent-item" onclick="setQ(\''+esc(h)+'\');doSearch()">'+esc(h)+'</div>';
+  }).join('');
+}
+
+// ── RENDER ALL ─────────────────────────────────────────────────────────────────
+function renderAll(d){
+  el('top-bar').style.display = 'block';
+  el('res-title').textContent = 'Lineage: "'+d.query+'"';
+  el('exp-row').style.display = 'flex';
+
+  // Update sidebar source pills
+  updateSrcPills(d.sources_used||[]);
+
+  // Render AI summary box
+  renderAISummaryBox(d);
+
+  // Status pills
+  var SC = {erwin:'#7FD962',dict:'#9B6DFF',code:'#3B9EFF',tachyon:'#F5A623'};
+  var SN = {'ERWIN DI':'erwin','Data Dictionary':'dict','Code Repo':'code','Tachyon AI':'tachyon'};
+  var pills = d.sources_used.map(function(s){
+    var k = Object.keys(SN).find(function(x){ return s.includes(x); });
+    var color = k ? (SC[SN[k]]||'#4E6E8A') : '#4E6E8A';
+    var isLive = s.includes('LIVE');
+    var isFile = s.includes('LOCAL')||s.includes('GITHUB')||s.includes('FILE');
+    var cls = isLive?'sp-live':isFile?'sp-file':'sp-mock';
+    var dotCls = isLive?'live':isFile?'file':'mock';
+    var dk = k ? SN[k] : null;
+    if(dk){
+      var dot = el('dot-'+dk);
+      if(dot) dot.className = 'st-dot '+(dk==='tachyon'?'ai':dotCls);
+    }
+    return '<div class="spill '+cls+'"><div class="sdot" style="background:'+color+'"></div>'+esc(s)+'</div>';
+  }).join('');
+
+  // SOR count
+  var sorSet = new Set();
+  d.metadata.forEach(function(m){ (m.sors||[]).forEach(function(s){ sorSet.add(s.sor); }); });
+  if(sorSet.size>0){
+    pills += '<div class="spill" style="border-color:rgba(245,166,35,.3);color:var(--gold2)"><div class="sdot" style="background:var(--gold)"></div>\u2605 '+sorSet.size+' SOR'+(sorSet.size!==1?'s':'')+'</div>';
+  }
+  pills += '<div class="spill"><div class="sdot" style="background:var(--t2)"></div>\u23F1 '+d.search_time_ms+'ms</div>';
+  pills += '<div class="spill"><div class="sdot" style="background:var(--t2)"></div>\uD83D\uDD17 '+d.nodes.length+'n &bull; '+d.edges.length+'e</div>';
+  el('stat-pills').innerHTML = pills;
+
+  if(d.ai_insights){
+    el('ai-sec').style.display = 'block';
+    el('ai-text').textContent = d.ai_insights;
+  }
+
+  renderMetadata(d.metadata);
+  renderSources(d);
+  // Show lineage pane first, THEN render graph
+  showTab('lineage');
+  setTimeout(function(){
+    setLevel('system');
+  }, 80);
+  // Metadata tab is pre-rendered — user can switch without re-render
+}
+
+// ── TABS ───────────────────────────────────────────────────────────────────────
+var ALL_TABS = ['lineage','metadata','sources','multi','erwin'];
+
+function showTab(t){
+  ALL_TABS.forEach(function(x){
+    var pane = el('pane-'+x);
+    var btn  = el('tb-'+x);
+    if(pane) pane.style.display = x===t ? 'block':'none';
+    if(btn)  btn.classList.toggle('on', x===t);
+  });
+  if(t==='lineage' && D) setTimeout(renderGraph, 60);
+  if(t==='erwin' && erwinEndpoints.length===0) loadErwinEndpoints();
+}
+
+function hideAllPanes(){
+  ALL_TABS.forEach(function(x){
+    var p = el('pane-'+x); if(p) p.style.display='none';
+  });
+}
+
+// ── LEVELS ─────────────────────────────────────────────────────────────────────
+function setLevel(lv){
+  curLevel = lv;
+  ['system','table','field'].forEach(function(x){
+    var b = el('lv-'+x); if(b) b.classList.toggle('on', x===lv);
+  });
+  updateBreadcrumb(lv);
+  if(D) renderGraph();
+}
+
+function setView(v){
+  curView = v;
+  el('vt-erd').classList.toggle('on', v==='erd');
+  el('vt-force').classList.toggle('on', v==='force');
+  el('erd-view').style.display   = v==='erd'   ? 'block':'none';
+  el('force-view').style.display = v==='force' ? 'block':'none';
+  renderGraph();
+}
+
+function updateBreadcrumb(lv){
+  if(!D) return;
+  var q   = D.query.toUpperCase();
+  var tbl = q.includes('.')?q.split('.')[0]:q;
+  var parts = [
+    {l:'All Systems', v:'system'},
+    {l:tbl+' Tables', v:'table'}
+  ];
+  if(lv==='field') parts.push({l:'Fields',v:'field'});
+  el('bc').innerHTML = parts.map(function(p,i){
+    var sep = i>0 ? '<span class="bc-sep">&rsaquo;</span>' : '';
+    if(p.v===lv) return sep+'<span class="bc-cur">'+esc(p.l)+'</span>';
+    return sep+'<span class="bc-item" onclick="setLevel(\''+p.v+'\')">'+esc(p.l)+'</span>';
+  }).join('');
+}
+
+// ── GRAPH DATA ─────────────────────────────────────────────────────────────────
+function buildGraphData(d, lv){
+  var q   = d.query.toUpperCase();
+  var tbl = q.includes('.')?q.split('.')[0]:q;
+  var fld = q.includes('.')?q.split('.')[1]:null;
+
+  if(lv==='system'){
+    var sysMap = {};
+    var TM = {source_table:'sys_src',target_table:'sys_tgt',transformation:'sys_trf',code_repo:'sys_code'};
+    d.nodes.forEach(function(n){
+      var sn = n.system||(n.type==='code_repo'?'Code Repository':'Unknown');
+      if(!sysMap[sn]) sysMap[sn] = {id:'SYS_'+sn.replace(/\W/g,'_'),label:sn,type:TM[n.type]||'sys_src',fields:[]};
+    });
+    var nodes = Object.values(sysMap);
+    var edges = [];
+    var seen  = {};
+    d.edges.forEach(function(e){
+      var sn = d.nodes.find(function(n){ return n.id===e.source; });
+      var tn = d.nodes.find(function(n){ return n.id===e.target; });
+      if(!sn||!tn) return;
+      var sk = 'SYS_'+(sn.system||(sn.type==='code_repo'?'Code Repository':'Unknown')).replace(/\W/g,'_');
+      var tk = 'SYS_'+(tn.system||(tn.type==='code_repo'?'Code Repository':'Unknown')).replace(/\W/g,'_');
+      if(sk===tk) return;
+      var k = sk+'>'+tk;
+      if(!seen[k]){ seen[k]=1; edges.push({id:k,source:sk,target:tk,label:e.label||'flow'}); }
+    });
+    return {nodes:nodes, edges:edges};
+  }
+
+  if(lv==='table'){
+    return {
+      nodes: d.nodes.map(function(n){ return Object.assign({},n,{label:n.label.replace(/\n.*/,'')}); }),
+      edges: d.edges
+    };
+  }
+
+  if(lv==='field'){
+    var nodes=[],edges=[];
+    var sN=d.nodes.find(function(n){return n.type==='source_table';});
+    var tN=d.nodes.find(function(n){return n.type==='target_table';});
+    var rN=d.nodes.find(function(n){return n.type==='transformation';});
+    var cN=d.nodes.find(function(n){return n.type==='code_repo';});
+    if(sN)(sN.fields||[]).forEach(function(f){
+      nodes.push({id:'FS_'+f.name,label:f.name,type:'src_field',fieldName:f.name,
+        tableName:sN.label,dataType:f.type,description:f.description,risk_level:f.risk||'Low',
+        highlighted:!!(fld&&f.name===fld),fields:[]});
+    });
+    if(rN) nodes.push(Object.assign({},rN,{label:'Transform',fields:[]}));
+    if(tN)(tN.fields||[]).forEach(function(f){
+      nodes.push({id:'FT_'+f.name,label:f.name,type:'tgt_field',fieldName:f.name,
+        tableName:tN.label,dataType:f.type,description:f.description,risk_level:f.risk||'Low',
+        highlighted:!!(fld&&f.name===fld),fields:[]});
+    });
+    if(cN) nodes.push(Object.assign({},cN,{label:'Code Repo',fields:[]}));
+    if(sN&&rN)(sN.fields||[]).forEach(function(f){
+      edges.push({id:'EFS_'+f.name,source:'FS_'+f.name,target:rN.id,label:'\u2192'});
+    });
+    if(rN&&tN)(tN.fields||[]).forEach(function(f){
+      edges.push({id:'EFT_'+f.name,source:rN.id,target:'FT_'+f.name,label:'\u2192'});
+    });
+    if(cN&&rN) edges.push({id:'EC',source:cN.id,target:rN.id,label:'impl'});
+    return {nodes:nodes,edges:edges};
+  }
+
+  return {nodes:d.nodes, edges:d.edges};
+}
+
+function renderGraph(){
+  if(!D) return;
+  var titles = {
+    system:'&#x1F3E2; SYSTEM LEVEL',
+    table:'&#x1F5C3; TABLE LEVEL',
+    field:'&#x1F532; FIELD LEVEL'
+  };
+  var subs = {
+    system:'Cross-system lineage: source platforms \u2192 ETL \u2192 data warehouse',
+    table:'Table-to-table data flow with transformation logic',
+    field:'Column-to-column mapping with business rules'
+  };
+  el('g-title').innerHTML = (titles[curLevel]||'') + ' &mdash; ' + (curView==='erd'?'ERD Flow':'Force Graph');
+  el('g-sub').textContent = subs[curLevel]||'';
+  var gd = buildGraphData(D, curLevel);
+  if(curView==='erd') drawERD(gd.nodes, gd.edges);
+  else drawForce(gd.nodes, gd.edges);
+  drawLegend();
+}
+
+// ── ERD GRAPH ──────────────────────────────────────────────────────────────────
+function erdClass(t){
+  if(t==='source_table'||t==='src_field'||t==='sys_src') return 'ec-src';
+  if(t==='target_table'||t==='tgt_field'||t==='sys_tgt') return 'ec-tgt';
+  if(t==='transformation'||t==='sys_trf') return 'ec-trf';
+  if(t==='code_repo'||t==='sys_code') return 'ec-code';
+  return 'ec-src';
+}
+function erdColor(t){
+  if(!t) return '#4E6E8A';
+  if(t.indexOf('src')>-1||t==='source_table') return '#7FD962';
+  if(t.indexOf('tgt')>-1||t==='target_table') return '#3B9EFF';
+  if(t.indexOf('trf')>-1||t==='transformation') return '#F5A623';
+  if(t.indexOf('code')>-1) return '#00C9B1';
+  return '#4E6E8A';
+}
+function erdBadge(t){
+  var m={source_table:'SRC',target_table:'TGT',transformation:'ETL',code_repo:'CODE',
+    src_field:'SRC',tgt_field:'TGT',sys_src:'SYS',sys_tgt:'SYS',sys_trf:'ETL',sys_code:'CODE'};
+  return m[t]||'OBJ';
+}
+function erdIcon(t){
+  var m={source_table:'&#x1F5C4;',target_table:'&#x1F3ED;',transformation:'&#x2699;',code_repo:'&#x1F4BB;',
+    src_field:'&#x1F4E5;',tgt_field:'&#x1F4E4;',sys_src:'&#x1F3E2;',sys_tgt:'&#x1F3ED;',
+    sys_trf:'&#x2699;',sys_code:'&#x1F4BB;'};
+  return m[t]||'&#x1F4E6;';
+}
+
+function drawERD(nodes, edges){
+  var host = el('erd-host');
+  var svg  = el('erd-svg');
+  host.innerHTML = '';
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  svg.setAttribute('width','3000');
+  svg.setAttribute('height','2000');
+
+  // Arrow marker defs
+  var ns  = 'http://www.w3.org/2000/svg';
+  var def = document.createElementNS(ns,'defs');
+  [['g','#7FD962'],['b','#3B9EFF'],['a','#F5A623'],['c','#00C9B1']].forEach(function(kc){
+    var m = document.createElementNS(ns,'marker');
+    m.setAttribute('id','em'+kc[0]); m.setAttribute('viewBox','0 -4 8 8');
+    m.setAttribute('refX','7'); m.setAttribute('refY','0');
+    m.setAttribute('markerWidth','5'); m.setAttribute('markerHeight','5'); m.setAttribute('orient','auto');
+    var p = document.createElementNS(ns,'path');
+    p.setAttribute('d','M0,-4L8,0L0,4'); p.setAttribute('fill',kc[1]); p.setAttribute('opacity','.9');
+    m.appendChild(p); def.appendChild(m);
+  });
+  svg.appendChild(def);
+
+  // Column layout
+  var colOf = {source_table:0,src_field:0,sys_src:0,transformation:1,sys_trf:1,
+               target_table:2,tgt_field:2,sys_tgt:2,code_repo:3,sys_code:3};
+  var cols  = [[],[],[],[]];
+  nodes.forEach(function(n){ cols[(colOf[n.type]!==undefined?colOf[n.type]:0)].push(n); });
+
+  var CW=192, CG=130, RS=28, RG=16, FH=24, HH=34;
+  var CX=[36, 36+CW+CG, 36+2*(CW+CG), 36+3*(CW+CG)];
+  nodePositions = {};
+
+  cols.forEach(function(col, ci){
+    var y = RS;
+    col.forEach(function(n){
+      var fl = n.fields||[];
+      var h  = HH + Math.max(1, fl.length)*FH;
+      nodePositions[n.id] = {x:CX[ci], y:y, w:CW, h:h, col:ci};
+      y += h + RG;
+    });
+  });
+
+  var hiField = D && D.query && D.query.indexOf('.')>-1 ? D.query.toUpperCase().split('.')[1] : null;
+
+  nodes.forEach(function(n){
+    var pos = nodePositions[n.id]; if(!pos) return;
+    var cls   = erdClass(n.type);
+    var color = erdColor(n.type);
+    var badge = erdBadge(n.type);
+    var icon  = erdIcon(n.type);
+    var fields = n.fields||(n.fieldName?[{name:n.fieldName||n.label,type:n.dataType||'',description:n.description||''}]:[]);
+
+    var fieldsHtml = '';
+    if(fields.length){
+      fieldsHtml = fields.map(function(f){
+        var hi = !!(hiField && f.name===hiField);
+        var rc = {High:'#FF4F6D',Medium:'#F5A623',Low:'#7FD962'}[f.risk||'Low']||'#4E6E8A';
+        return '<div class="erd-field'+(hi?' hi':'')+'" onclick="onErdField(\''+esc(n.id)+'\',\''+esc(f.name)+'\')" title="'+esc(f.description||f.name)+'">'+
+          '<div class="erd-anc" style="border-color:'+color+'50;background:'+color+'15"></div>'+
+          '<div class="erd-fn"'+(hi?' style="color:#F5A623"':'')+'>'+esc(f.name)+'</div>'+
+          '<div class="erd-ft">'+esc(f.type||'')+'</div>'+
+          '<div class="erd-frisk" style="background:'+rc+'"></div>'+
+        '</div>';
+      }).join('');
+    } else {
+      fieldsHtml = '<div class="erd-field" onclick="onErdNode(\''+esc(n.id)+'\')">'+
+        '<div class="erd-anc" style="border-color:'+color+'50;background:'+color+'15"></div>'+
+        '<div class="erd-fn" style="color:'+color+'">'+esc(n.label||n.id)+'</div>'+
+        '</div>';
+    }
+
+    var card = document.createElement('div');
+    card.className = 'erd-card '+cls;
+    card.id = 'ec-'+n.id;
+    card.style.cssText = 'left:'+pos.x+'px;top:'+pos.y+'px;width:'+pos.w+'px;';
+    card.innerHTML =
+      '<div class="erd-hdr">'+
+        '<div class="erd-drag"><span class="erd-ico">'+icon+'</span>'+
+          '<span class="erd-name" title="'+esc(n.label||n.id)+'">'+esc(n.label||n.id)+'</span></div>'+
+        '<span class="erd-badge">'+badge+'</span>'+
+        (fields.length ? '<span class="erd-fc">'+fields.length+'f</span>' : '')+
+      '</div>'+fieldsHtml;
+
+    // Drag on header
+    var drag=false, ox=0, oy=0;
+    var dragHandle = card.querySelector('.erd-drag');
+    dragHandle.style.cursor = 'move';
+    dragHandle.addEventListener('mousedown', function(e){
+      drag=true; ox=e.clientX-nodePositions[n.id].x; oy=e.clientY-nodePositions[n.id].y;
+      e.preventDefault(); e.stopPropagation();
+    });
+    document.addEventListener('mousemove', function(e){
+      if(!drag) return;
+      nodePositions[n.id].x = e.clientX-ox; nodePositions[n.id].y = e.clientY-oy;
+      card.style.left = nodePositions[n.id].x+'px'; card.style.top = nodePositions[n.id].y+'px';
+      drawConnectors(nodes, edges);
+    });
+    document.addEventListener('mouseup', function(){ drag=false; });
+
+    host.appendChild(card);
+  });
+
+  setTimeout(function(){ drawConnectors(nodes,edges); }, 50);
+  setupERDPan();
+  erdScale=1; erdX=20; erdY=20;
+  el('erd-world').style.transform = 'translate('+erdX+'px,'+erdY+'px) scale('+erdScale+')';
+}
+
+function drawConnectors(nodes, edges){
+  var svg = el('erd-svg');
+  var ns  = 'http://www.w3.org/2000/svg';
+  // Remove all non-defs children
+  var toRemove = [];
+  for(var i=0;i<svg.childNodes.length;i++){
+    if(svg.childNodes[i].nodeName!=='defs') toRemove.push(svg.childNodes[i]);
+  }
+  toRemove.forEach(function(c){ svg.removeChild(c); });
+
+  edges.forEach(function(e){
+    var sp = nodePositions[e.source], tp = nodePositions[e.target];
+    if(!sp||!tp) return;
+    var sn = nodes.find(function(n){ return n.id===e.source; });
+    var col = erdColor(sn ? sn.type : '');
+    var mk = (sn&&(sn.type.indexOf('src')>-1||sn.type==='source_table'))?'g':
+             (sn&&(sn.type.indexOf('tgt')>-1||sn.type==='target_table'))?'b':
+             (sn&&(sn.type.indexOf('trf')>-1||sn.type==='transformation'))?'a':'c';
+    var x1=sp.x+sp.w, y1=sp.y+(sp.h||60)/2;
+    var x2=tp.x,      y2=tp.y+(tp.h||60)/2;
+    var mx=(x1+x2)/2;
+    var path = document.createElementNS(ns,'path');
+    path.setAttribute('d','M'+x1+','+y1+' C'+mx+','+y1+' '+mx+','+y2+' '+x2+','+y2);
+    path.setAttribute('fill','none'); path.setAttribute('stroke',col);
+    path.setAttribute('stroke-width','1.8'); path.setAttribute('stroke-opacity','.5');
+    path.setAttribute('marker-end','url(#em'+mk+')');
+    svg.appendChild(path);
+  });
+}
+
+function setupERDPan(){
+  var pan   = el('erd-pan');
+  var world = el('erd-world');
+  pan.onmousedown = function(e){
+    if(e.target.closest('.erd-drag')) return;
+    erdDragging=true; erdDragStart={x:e.clientX-erdX, y:e.clientY-erdY};
+    pan.style.cursor='grabbing';
+  };
+  document.addEventListener('mousemove', function(e){
+    if(!erdDragging) return;
+    erdX=e.clientX-erdDragStart.x; erdY=e.clientY-erdDragStart.y;
+    world.style.transform='translate('+erdX+'px,'+erdY+'px) scale('+erdScale+')';
+  });
+  document.addEventListener('mouseup', function(){
+    if(erdDragging){ erdDragging=false; el('erd-pan').style.cursor=''; }
+  });
+  pan.onwheel = function(e){
+    e.preventDefault();
+    var f = e.deltaY<0 ? 1.12 : 0.9;
+    erdScale = Math.max(0.15, Math.min(4, erdScale*f));
+    world.style.transform='translate('+erdX+'px,'+erdY+'px) scale('+erdScale+')';
+  };
+}
+
+function applyERDTransform(){
+  el('erd-world').style.transform='translate('+erdX+'px,'+erdY+'px) scale('+erdScale+')';
+}
+
+function onErdField(nid, fname){
+  var m = D && D.metadata ? D.metadata.find(function(x){ return x.field_name===fname; }) : null;
+  if(m){ showTab('metadata'); selectField(m); }
+  else toast('Field: '+fname, 'info');
+}
+function onErdNode(nid){
+  var n = D && D.nodes ? D.nodes.find(function(x){ return x.id===nid; }) : null;
+  if(n) openNodeModal(n);
+}
+
+// ── FORCE GRAPH ────────────────────────────────────────────────────────────────
+function drawForce(nodes, edges){
+  var cont = el('force-svg');
+  var W = cont.parentElement.clientWidth||840, H=490;
+  d3.select('#force-svg').selectAll('*').remove();
+  fSvg = d3.select('#force-svg').attr('viewBox','0 0 '+W+' '+H).attr('width',W).attr('height',H);
+  var defs = fSvg.append('defs');
+  var AC={g:'#7FD962',b:'#3B9EFF',a:'#F5A623',c:'#00C9B1',r:'#FF4F6D',df:'#1E3450'};
+  Object.entries(AC).forEach(function(kv){
+    defs.append('marker').attr('id','fa'+kv[0]).attr('viewBox','0 -4 8 8').attr('refX','28')
+      .attr('refY','0').attr('markerWidth','5').attr('markerHeight','5').attr('orient','auto')
+      .append('path').attr('d','M0,-4L8,0L0,4').attr('fill',kv[1]).attr('opacity','.8');
+  });
+  defs.append('filter').attr('id','glow').html('<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>');
+  defs.append('filter').attr('id','glowH').html('<feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>');
+  fG = fSvg.append('g');
+  fZoom = d3.zoom().scaleExtent([.1,5]).on('zoom', function(ev){ fG.attr('transform',ev.transform); });
+  fSvg.call(fZoom);
+
+  var NS={
+    source_table:{r:32,fill:'#08180A',stroke:'#7FD962',sw:2,ak:'g'},
+    target_table:{r:32,fill:'#080D18',stroke:'#3B9EFF',sw:2,ak:'b'},
+    transformation:{r:26,fill:'#18130A',stroke:'#F5A623',sw:2,ak:'a'},
+    code_repo:{r:22,fill:'#041412',stroke:'#00C9B1',sw:1.5,ak:'c'},
+    src_field:{r:17,fill:'#08180A',stroke:'#7FD962',sw:1.5,ak:'g'},
+    tgt_field:{r:17,fill:'#080D18',stroke:'#3B9EFF',sw:1.5,ak:'b'},
+    sys_src:{r:36,fill:'#08180A',stroke:'#7FD962',sw:2.5,ak:'g'},
+    sys_tgt:{r:36,fill:'#080D18',stroke:'#3B9EFF',sw:2.5,ak:'b'},
+    sys_trf:{r:28,fill:'#18130A',stroke:'#F5A623',sw:2,ak:'a'},
+    sys_code:{r:22,fill:'#041412',stroke:'#00C9B1',sw:1.5,ak:'c'},
+  };
+  function gs(t){ return NS[t]||{r:22,fill:'#080E18',stroke:'#1E3450',sw:1.5,ak:'df'}; }
+
+  var link = fG.append('g').selectAll('path').data(edges).enter().append('path')
+    .attr('fill','none')
+    .attr('stroke',function(d){ var s=nodes.find(function(n){return n.id===d.source;}); return AC[gs(s&&s.type).ak]||AC.df; })
+    .attr('stroke-width',1.6).attr('stroke-opacity',.45)
+    .attr('marker-end',function(d){ var s=nodes.find(function(n){return n.id===d.source;}); return 'url(#fa'+(gs(s&&s.type).ak||'df')+')'; });
+
+  var node = fG.append('g').selectAll('g').data(nodes).enter().append('g')
+    .style('cursor','pointer')
+    .on('click', function(ev,d){ onForceNodeClick(d); })
+    .call(d3.drag()
+      .on('start',function(ev,d){ if(!ev.active) sim.alphaTarget(.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on('drag', function(ev,d){ d.fx=ev.x; d.fy=ev.y; })
+      .on('end',  function(ev,d){ if(!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+  node.append('circle')
+    .attr('r',function(d){return gs(d.type).r;})
+    .attr('fill',function(d){return gs(d.type).fill;})
+    .attr('stroke',function(d){return gs(d.type).stroke;})
+    .attr('stroke-width',function(d){return gs(d.type).sw;})
+    .attr('filter','url(#glow)')
+    .on('mouseover',function(){ d3.select(this).attr('filter','url(#glowH)'); })
+    .on('mouseout', function(){ d3.select(this).attr('filter','url(#glow)'); });
+
+  node.each(function(d){
+    var r = gs(d.type).r;
+    (d.label||'').split('\n').forEach(function(ln,i){
+      d3.select(this).append('text').attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('y',r+10+(i*11)).attr('font-size','9px').attr('fill','#4E6E8A')
+        .attr('font-family','JetBrains Mono,monospace').attr('pointer-events','none')
+        .text(ln.length>14?ln.slice(0,12)+'\u2026':ln);
+    }.bind(this));
+  });
+
+  // Tooltip
+  node.on('mouseover.tt',function(ev,d){
+    document.getElementById('g-tt') && document.getElementById('g-tt').remove();
+    var tt=document.createElement('div'); tt.id='g-tt';
+    var c=gs(d.type).stroke;
+    tt.style.cssText='position:fixed;background:#06090f;border:1px solid '+c+'40;border-left:2px solid '+c+';border-radius:6px;padding:7px 11px;font-size:10px;color:#F2F8FF;pointer-events:none;z-index:300;max-width:200px;line-height:1.5;box-shadow:0 6px 24px rgba(0,0,0,.8)';
+    tt.innerHTML='<b style="color:'+c+'">'+(d.label||d.id).replace('\n',' ')+'</b><br><span style="font-size:8px;color:#4E6E8A">'+(d.type||'').replace(/_/g,' ')+'</span>'+(d.system?'<br><span style="font-size:8px;color:#4E6E8A">'+d.system+'</span>':'');
+    document.body.appendChild(tt);
+    moveTT(ev);
+  }).on('mousemove.tt',moveTT).on('mouseout.tt',function(){ var t=document.getElementById('g-tt'); if(t) t.remove(); });
+
+  function moveTT(ev){
+    var t=document.getElementById('g-tt');
+    if(t){ t.style.left=(ev.clientX+12)+'px'; t.style.top=(ev.clientY-6)+'px'; }
+  }
+
+  var sim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(function(d){return d.id;}).distance(curLevel==='system'?170:120).strength(.6))
+    .force('charge', d3.forceManyBody().strength(-460))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collide', d3.forceCollide(function(d){return gs(d.type).r+13;}))
+    .on('tick', function(){
+      link.attr('d',function(d){
+        var dx=d.target.x-d.source.x, dy=d.target.y-d.source.y;
+        var dr=Math.sqrt(dx*dx+dy*dy)*1.2;
+        return 'M'+d.source.x+','+d.source.y+' A'+dr+','+dr+' 0 0,1 '+d.target.x+','+d.target.y;
+      });
+      node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});
+    });
+
+  if(curLevel==='table'||curLevel==='system'){
+    nodes.forEach(function(n){
+      if(n.type==='source_table'||n.type==='sys_src'){n.fx=W*.16;n.fy=H*.44;}
+      else if(n.type==='target_table'||n.type==='sys_tgt'){n.fx=W*.78;n.fy=H*.44;}
+      else if(n.type==='transformation'||n.type==='sys_trf'){n.fx=W*.46;n.fy=H*.37;}
+      else if(n.type==='code_repo'||n.type==='sys_code'){n.fx=W*.46;n.fy=H*.70;}
+    });
+    setTimeout(function(){
+      nodes.forEach(function(n){ if(n.type!=='code_repo'&&n.type!=='sys_code'){n.fx=null;n.fy=null;} });
+      sim.alpha(.25).restart();
+    }, 1800);
+  }
+}
+
+function onForceNodeClick(d){
+  var gtt = document.getElementById('g-tt'); if(gtt) gtt.remove();
+  if(curLevel==='system'){ setLevel('table'); toast('Drilled into Table Level','info'); }
+  else if(curLevel==='table'){ setLevel('field'); toast('Drilled into Field Level','info'); }
+  else{
+    var m = D && D.metadata ? D.metadata.find(function(x){ return x.field_name===(d.fieldName||d.field); }) : null;
+    if(m){ showTab('metadata'); selectField(m); } else openNodeModal(d);
+  }
+}
+
+// ── GRAPH CONTROLS ─────────────────────────────────────────────────────────────
+function gZoomIn(){
+  if(curView==='erd'){ erdScale=Math.min(4,erdScale*1.28); applyERDTransform(); }
+  else if(fSvg&&fZoom) fSvg.transition().call(fZoom.scaleBy,1.4);
+}
+function gZoomOut(){
+  if(curView==='erd'){ erdScale=Math.max(.15,erdScale*.78); applyERDTransform(); }
+  else if(fSvg&&fZoom) fSvg.transition().call(fZoom.scaleBy,.72);
+}
+function gFit(){
+  if(curView==='erd'){ erdScale=1; erdX=20; erdY=20; applyERDTransform(); }
+  else if(fSvg&&fZoom) fSvg.transition().call(fZoom.transform, d3.zoomIdentity);
+}
+function gFullscreen(){
+  var c = document.querySelector('.gbox');
+  if(!document.fullscreenElement) c.requestFullscreen().catch(function(){});
+  else document.exitFullscreen();
+}
+
+function drawLegend(){
+  var items = [
+    {c:'#7FD962',l:'Source'},{c:'#F5A623',l:'Transform/ETL'},
+    {c:'#3B9EFF',l:'Target'},{c:'#00C9B1',l:'Code Repo'}
+  ];
+  el('g-legend').innerHTML = items.map(function(i){
+    return '<div class="leg-i"><div class="leg-d" style="background:'+i.c+'"></div>'+i.l+'</div>';
+  }).join('');
+}
+
+// ── METADATA ───────────────────────────────────────────────────────────────────
+function renderMetadata(meta){
+  el('meta-count').textContent = meta.length+' field'+(meta.length!==1?'s':'')+' discovered \u00B7 Confidentiality \u00B7 SOR \u00B7 Equivalent Fields \u00B7 Lineage Path';
+  if(!meta.length){
+    el('meta-tbl').innerHTML = '<div style="padding:40px;text-align:center;color:var(--t2)"><div style="font-size:28px;margin-bottom:8px">&#x1F4CB;</div><div>No metadata found</div></div>';
+    return;
+  }
+  var cols = '140px 80px 56px 64px 1fr 80px';
+  var rows = meta.map(function(m,i){
+    return '<div class="meta-row" id="mr-'+i+'" style="grid-template-columns:'+cols+'" onclick="selectField(D.metadata['+i+'])">'+
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:600;background:linear-gradient(90deg,var(--gold2),var(--teal2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">'+(m.is_pk?'&#x1F511; ':'')+esc(m.field_name)+'</div>'+
+      '<div><span class="dtype" style="font-size:8px">'+esc(m.data_type||'VARCHAR')+'</span></div>'+
+      '<div><span class="rb rb-'+(m.risk_level||'L')[0]+'" style="font-size:8px">'+esc(m.risk_level||'Low')+'</span></div>'+
+      '<div>'+confBadge(m.confidentiality||'Internal')+'</div>'+
+      '<div style="font-size:10px;color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.description||'\u2014')+'</div>'+
+      '<div><span class="ing-pill '+((m.ingestion_pattern||'')==='Real-Time Streaming'?'ing-rt':'ing-batch')+'" style="font-size:8px">'+(((m.ingestion_pattern||'')==='Real-Time Streaming')?'RT':'Btch')+'</span></div>'+
+    '</div>';
+  }).join('');
+  el('meta-tbl').innerHTML =
+    '<div class="meta-hdr" style="grid-template-columns:'+cols+'">'+
+      '<div>Field</div><div>Type</div><div>Risk</div><div>Confid.</div><div>Description</div><div>Ingestion</div>'+
+    '</div>'+rows;
+}
+
+function selectField(m){
+  selField = m;
+  document.querySelectorAll('.meta-row').forEach(function(r){ r.classList.remove('sel'); });
+  var i = D.metadata.indexOf(m);
+  var row = el('mr-'+i); if(row) row.classList.add('sel');
+
+  var sorHtml = '';
+  if(m.sors && m.sors.length){
+    sorHtml = '<div class="fd-sec">'+
+      '<div class="fd-sec-t">&#x1F4CB; Systems of Record (SOR)</div>'+
+      '<div style="font-size:9px;color:var(--t2);margin-bottom:5px">Click to set authoritative SOR.</div>'+
+      m.sors.map(function(s){
+        return '<div class="sor-card '+(s.is_authoritative?'auth':'')+'" onclick="doSetSOR(\''+esc(m.field_name)+'\',\''+esc(s.sor)+'\')">'+
+          '<div><div class="sor-name">'+esc(s.sor)+'</div><div class="sor-sys">'+esc(s.table||s.system||'')+'</div></div>'+
+          (s.is_authoritative?'<span class="sor-auth">\u2605 AUTH</span>':'')+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  var equivHtml = '';
+  if(m.equivalent_fields && m.equivalent_fields.length){
+    equivHtml = '<div class="fd-sec">'+
+      '<div class="fd-sec-t">&#x1F517; Equivalent Fields Across SORs</div>'+
+      '<div style="font-size:9px;color:var(--t2);margin-bottom:5px">Same field, different names across systems.</div>'+
+      '<div>'+m.equivalent_fields.map(function(e){
+        return '<span class="eq-item '+(e.alias_type==='known_equivalent'?'eq-exact':'')+'" title="'+(e.alias_type==='known_equivalent'?'Known alias':'Fuzzy match ('+e.similarity+')')+'" onclick="setQ(\''+esc(e.field)+'\');doSearch()">'+esc(e.field)+'</span>';
+      }).join('')+'</div>'+
+    '</div>';
+  }
+
+  var hopsHtml = '';
+  if(m.lineage_hops && m.lineage_hops.length){
+    hopsHtml = '<div class="fd-sec">'+
+      '<div class="fd-sec-t">&#x1F503; Full Lineage Path ('+m.lineage_hops.length+' hops)</div>'+
+      m.lineage_hops.map(function(h,i){
+        return '<div class="hop-row">'+
+          '<div class="hop-n">'+h.hop+'</div>'+
+          '<div class="hop-lbl">'+esc(h.system||h.table||'')+'</div>'+
+          '<div class="hop-type">'+esc(h.type?(h.type.replace(/_/g,' ')):'')+' </div>'+
+          (i<m.lineage_hops.length-1?'<span style="color:var(--t3);font-size:10px">&rarr;</span>':'')+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  el('fdetail').innerHTML =
+    '<div class="fd-head">'+
+      '<div class="fd-name">'+esc(m.field_name)+'</div>'+
+      '<div class="fd-tbl">'+esc(m.table_name)+'</div>'+
+      '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+
+        '<span class="dtype">'+esc(m.data_type||'VARCHAR')+'</span>'+
+        '<span class="rb rb-'+(m.risk_level||'L')[0]+'">'+esc(m.risk_level||'Low')+'</span>'+
+        (m.is_pk?'<span class="rb" style="background:rgba(245,166,35,.1);color:var(--gold2);border:1px solid rgba(245,166,35,.25)">&#x1F511; PK</span>':'')+
+        (!m.is_nullable?'<span class="rb" style="background:rgba(255,79,109,.08);color:var(--rose2);border:1px solid rgba(255,79,109,.2)">NOT NULL</span>':'')+
+        (m.tags||[]).map(function(t){return '<span class="tag">'+esc(t)+'</span>';}).join('')+
+      '</div>'+
+    '</div>'+
+    '<div class="fd-body">'+
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x1F4CB; Overview</div>'+
+        fr('Description',esc(m.description||'\u2014'))+
+        fr('Source System',esc(m.source_system||'\u2014'))+
+        fr('Owner',esc(m.owner||'\u2014'))+
+        fr('Updated',esc(m.last_updated||'\u2014'))+
+      '</div>'+
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x26A1; Confidentiality &amp; Ingestion</div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">'+
+          confBadge(m.confidentiality||'Internal')+
+          '<span class="ing-pill '+((m.ingestion_pattern||'')==='Real-Time Streaming'?'ing-rt':'ing-batch')+'">'+esc(m.ingestion_pattern||'Batch')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x2699; Business Logic</div>'+
+        '<div class="fd-code">'+esc(m.business_logic||'No logic defined')+'</div>'+
+      '</div>'+
+      (m.business_rules&&m.business_rules.length?
+        '<div class="fd-sec"><div class="fd-sec-t">&#x1F4CF; Business Rules</div>'+
+        m.business_rules.map(function(r){
+          return '<div style="font-size:10px;color:var(--t1);margin-bottom:4px;display:flex;gap:5px"><span style="color:var(--teal)">&rsaquo;</span>'+esc(r)+'</div>';
+        }).join('')+'</div>':'')+
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x1F517; Lineage Flow</div>'+
+        '<div class="lineage-flow">'+
+          (m.sources||[]).map(function(s){return '<span class="lf-n lf-src">&#x1F4E5; '+esc(s)+'</span>';}).join('')+
+          '<span class="lf-arr">&rarr;</span>'+
+          '<span class="lf-n" style="border-color:rgba(245,166,35,.3);color:var(--gold2)">&#x21BA; Transform</span>'+
+          '<span class="lf-arr">&rarr;</span>'+
+          (m.targets||[]).map(function(s){return '<span class="lf-n lf-tgt">&#x1F4E4; '+esc(s)+'</span>';}).join('')+
+        '</div>'+
+      '</div>'+
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x26A0; Impact</div>'+
+        fr('Impact',esc(m.impact||'No impact assessment'))+
+      '</div>'+
+      sorHtml + equivHtml + hopsHtml +
+      '<div class="fd-sec">'+
+        '<div class="fd-sec-t">&#x1F6E1; Risk Matrix</div>'+
+        '<div class="risk-tbl">'+
+          [{l:'High',i:'&#x1F534;',d:'Breaking change \u2014 downstream affected',a:'Data Steward + CAB approval'},
+           {l:'Medium',i:'&#x1F7E1;',d:'Moderate impact \u2014 verify dependencies',a:'Peer review + UAT'},
+           {l:'Low',i:'&#x1F7E2;',d:'Minimal risk',a:'Standard PR review'}].map(function(r){
+            return '<div class="risk-row" style="'+(r.l===m.risk_level?'background:rgba(245,166,35,.05)':'')+'">'+'<div class="risk-l">'+r.i+' <span class="rb rb-'+r.l[0]+'">'+r.l+'</span></div>'+'<div class="risk-r"><div class="risk-rd">'+r.d+'</div><div class="risk-ra">'+r.a+'</div></div></div>';
+          }).join('')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="fd-foot"><button class="pdf-btn" onclick="doDownloadPDF()">&#x1F4C4; DOWNLOAD PDF REPORT</button></div>';
+}
+
+// ── SOURCES ─────────────────────────────────────────────────────────────────────
+function renderSources(data){
+  var sd = data.source_details||{};
+  var cards = [];
+
+  // ERWIN
+  if(srcs.erwin){
+    var stat = (sd.erwin&&sd.erwin.status)||'mock';
+    var statLabels={live:'&#x1F7E2; LIVE API',local_excel:'&#x1F7E1; LOCAL EXCEL',local_json:'&#x1F7E1; LOCAL JSON',mock:'&#x26AA; MOCK'};
+    var statColors={live:'var(--lime2)',local_excel:'var(--gold2)',local_json:'var(--gold2)',mock:'var(--t2)'};
+    var en = data.nodes.filter(function(n){return n.type!=='code_repo';});
+    var sorList = [];
+    data.metadata.forEach(function(m){(m.sors||[]).forEach(function(s){if(sorList.indexOf(s.sor)<0) sorList.push(s.sor);});});
+    cards.push('<div class="src-card">'+
+      '<div class="sc-hdr">'+
+        '<div class="sc-ico" style="background:rgba(127,217,98,.1)">&#x1F3DB;</div>'+
+        '<div><div class="sc-name">ERWIN DI</div><div class="sc-stat" style="color:'+(statColors[stat]||'var(--t2)')+'">'+(statLabels[stat]||stat)+' &bull; '+en.length+' objects</div></div>'+
+        ((sd.erwin&&sd.erwin.source_file)?'<span class="sc-badge b-file" title="'+esc(sd.erwin.source_file)+'">&#x1F4C1; FILE</span>':'<span class="sc-badge b-live">ERWIN</span>')+
+      '</div>'+
+      ((sd.erwin&&sd.erwin.source_file)?'<div style="font-size:9px;color:var(--t2);margin-bottom:8px;word-break:break-all">&#x1F4C2; '+esc(sd.erwin.source_file)+'</div>':'')+
+      en.slice(0,4).map(function(n){
+        return '<div style="margin-bottom:6px;padding:6px 8px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid var(--bdr)">'+
+          '<div style="font-size:10px;font-weight:600">'+esc(n.label)+'</div>'+
+          '<div style="font-size:9px;color:var(--t2);margin-top:2px">'+esc(n.database||'\u2014')+' &bull; '+esc(n.schema_name||'\u2014')+' &bull; '+esc(n.system||'\u2014')+'</div>'+
+          (n.fields&&n.fields.length?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:2px">'+n.fields.map(function(f){return '<span class="dtype" style="font-size:8px">'+esc(f.name)+'</span>';}).join('')+'</div>':'')+
+        '</div>';
+      }).join('')+
+      (sorList.length?'<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--bdr)"><div style="font-size:9px;color:var(--t2);margin-bottom:4px;font-family:\'JetBrains Mono\',monospace">Known SORs in lineage:</div><div style="display:flex;gap:4px;flex-wrap:wrap">'+sorList.slice(0,8).map(function(s){return '<span class="dtype" style="color:var(--gold2);border-color:rgba(245,166,35,.25)">'+esc(s)+'</span>';}).join('')+'</div></div>':'')+
+    '</div>');
+  }
+
+  // Data Dictionary
+  if(srcs.dict){
+    var dstat = (sd.dict&&sd.dict.status)||'mock';
+    var dStatLabels={live:'&#x1F7E2; LIVE API',local_excel:'&#x1F7E1; LOCAL EXCEL',local_json:'&#x1F7E1; LOCAL JSON',local_file:'&#x1F7E1; LOCAL FILE',mock:'&#x26AA; MOCK'};
+    var dStatColors={live:'var(--vio2)',local_excel:'var(--gold2)',local_json:'var(--gold2)',local_file:'var(--gold2)',mock:'var(--t2)'};
+    cards.push('<div class="src-card">'+
+      '<div class="sc-hdr">'+
+        '<div class="sc-ico" style="background:rgba(155,109,255,.1)">&#x1F4D6;</div>'+
+        '<div><div class="sc-name">Data Dictionary</div><div class="sc-stat" style="color:'+(dStatColors[dstat]||'var(--t2)')+'">'+(dStatLabels[dstat]||dstat)+' &bull; '+data.metadata.length+' fields</div></div>'+
+        ((sd.dict&&sd.dict.source_file)?'<span class="sc-badge b-file">&#x1F4C1; FILE</span>':'<span class="sc-badge b-ai">DICT</span>')+
+      '</div>'+
+      ((sd.dict&&sd.dict.source_file)?'<div style="font-size:9px;color:var(--t2);margin-bottom:7px;word-break:break-all">&#x1F4C2; '+esc(sd.dict.source_file)+'</div>':'')+
+      data.metadata.slice(0,5).map(function(m){
+        return '<div style="margin-bottom:5px;padding:5px 7px;background:rgba(0,0,0,.3);border-radius:4px;border:1px solid var(--bdr)">'+
+          '<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">'+
+            '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:600;background:linear-gradient(90deg,var(--gold2),var(--teal2));-webkit-background-clip:text;-webkit-text-fill-color:transparent">'+esc(m.field_name)+'</span>'+
+            '<span class="dtype" style="font-size:8px">'+esc(m.data_type||'')+'</span>'+
+            '<span class="rb rb-'+(m.risk_level||'L')[0]+'" style="font-size:8px">'+esc(m.risk_level||'Low')+'</span>'+
+          '</div>'+
+          '<div style="font-size:9px;color:var(--t2)">'+esc(m.description||'\u2014')+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>');
+  }
+
+  // Code Repo
+  if(srcs.code){
+    var cnode = data.nodes.find(function(n){return n.type==='code_repo';});
+    var cres  = (cnode&&cnode.code_results)||[];
+    var cstat = (sd.code&&sd.code.status)||'mock';
+    var cLabel={github:'&#x1F419; GITHUB',local:'&#x1F4C1; LOCAL',mock:'&#x26AA; MOCK'}[cstat]||cstat.toUpperCase();
+    var cColor={github:'var(--lime2)',local:'var(--sky2)',mock:'var(--t2)'}[cstat]||'var(--t2)';
+    cards.push('<div class="src-card">'+
+      '<div class="sc-hdr">'+
+        '<div class="sc-ico" style="background:rgba(59,158,255,.1)">&#x1F4BB;</div>'+
+        '<div><div class="sc-name">Code Repository</div><div class="sc-stat" style="color:'+cColor+'">'+cLabel+' &bull; '+cres.length+' scripts</div></div>'+
+        '<span class="sc-badge '+(cstat==='github'?'b-live':cstat==='local'?'b-file':'b-mock')+'">'+cstat.toUpperCase()+'</span>'+
+      '</div>'+
+      (cres.length?cres.map(function(c){
+        return '<div style="margin-bottom:9px">'+
+          '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">'+
+            '<span class="lang-pill lp-'+esc(c.language)+'">'+esc(c.language)+'</span>'+
+            '<span style="font-size:9px;color:var(--t1)">'+esc(c.file)+'</span>'+
+            (c.url?'<a href="'+esc(c.url)+'" target="_blank" style="font-size:8px;color:var(--sky2);margin-left:auto">GitHub &nearr;</a>':'')+
+          '</div>'+
+          '<div class="code-blk">'+esc(c.business_logic)+'</div>'+
+          '<div style="font-size:8px;color:var(--t3)">&#x1F4C1; '+esc(c.path)+'</div>'+
+          (c.ai_summary?'<div class="ai-insight-card"><div class="ai-insight-text">'+esc(c.ai_summary)+'</div></div>':'')+
+        '</div>';
+      }).join(''):
+      '<div style="font-size:11px;color:var(--t3)">No scripts found</div>')+
+    '</div>');
+  }
+
+  // Tachyon AI
+  if(srcs.tachyon && data.ai_insights){
+    cards.push('<div class="src-card" style="border-color:rgba(155,109,255,.3)">'+
+      '<div class="sc-hdr">'+
+        '<div class="sc-ico" style="background:rgba(155,109,255,.1)">&#x1F916;</div>'+
+        '<div><div class="sc-name">Tachyon AI</div><div class="sc-stat" style="color:var(--vio2)">&#x1F7E3; LLM ENRICHMENT</div></div>'+
+        '<span class="sc-badge b-ai">LLM</span>'+
+      '</div>'+
+      '<div class="ai-insight-card"><div class="ai-insight-text">'+esc(data.ai_insights)+'</div></div>'+
+    '</div>');
+  }
+
+  el('src-cards').innerHTML = cards.join('');
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────────────────
+function openNodeModal(d){
+  el('modal-title').textContent = d.label||d.id;
+  el('modal-body').innerHTML =
+    fr('Type', esc((d.type||'').replace(/_/g,' ')))+
+    fr('System', esc(d.system||'\u2014'))+
+    fr('Database', esc(d.database||'\u2014'))+
+    fr('Risk', '<span class="rb rb-'+(d.risk_level||'L')[0]+'">'+esc(d.risk_level||'Low')+'</span>')+
+    (d.description?fr('Description',esc(d.description)):'')+
+    (d.code_results?
+      '<div style="margin-top:11px"><div class="fd-sec-t">Code References</div>'+
+      d.code_results.map(function(c){
+        return '<div style="margin-bottom:7px"><span class="lang-pill lp-'+esc(c.language)+'">'+esc(c.language)+'</span><div class="code-blk">'+esc(c.business_logic)+'</div></div>';
+      }).join('')+'</div>':'');
+  el('overlay').classList.add('open');
+}
+function closeModal(){ el('overlay').classList.remove('open'); }
+function closeOverlay(e){ if(e.target===el('overlay')) closeModal(); }
+
+// ── SOR SELECT ─────────────────────────────────────────────────────────────────
+async function doSetSOR(fieldName, sor){
+  try{
+    var r = await fetch(API+'/api/sor-select',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({field_name:fieldName, preferred_sor:sor})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    toast('\u2605 '+fieldName+' \u2192 '+sor+' set as authoritative SOR', 'success');
+    // Update in-memory data and re-render
+    if(selField && selField.field_name===fieldName && selField.sors){
+      selField.sors.forEach(function(s){ s.is_authoritative = s.sor.toUpperCase()===sor.toUpperCase(); });
+      selField.preferred_sor = sor;
+      selectField(selField);
+    }
+  } catch(e){ toast('SOR error: '+e.message,'error'); }
+}
+
+// ── EXPORTS ────────────────────────────────────────────────────────────────────
+async function doExportExcel(){
+  if(!D){ toast('Run a search first','warn'); return; }
+  toast('&#x1F4CA; Generating Excel...','info');
+  try{
+    var r = await fetch(API+'/api/export/excel',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query:D.query,metadata:D.metadata,nodes:D.nodes,edges:D.edges,sources_used:D.sources_used,ai_insights:D.ai_insights||null})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    var blob = await r.blob();
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'DataLineage_'+D.query+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    a.click(); URL.revokeObjectURL(url);
+    toast('\u2705 Excel downloaded!','success');
+  } catch(e){ toast('Excel error: '+e.message,'error'); }
+}
+
+async function doExportJSON(){
+  if(!D){ toast('Run a search first','warn'); return; }
+  toast('&#x1F4E6; Generating JSON...','info');
+  try{
+    var r = await fetch(API+'/api/export/json',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({query:D.query,metadata:D.metadata,nodes:D.nodes,edges:D.edges,sources_used:D.sources_used,ai_insights:D.ai_insights||null})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    var blob = await r.blob();
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'DataLineage_'+D.query+'_'+new Date().toISOString().slice(0,10)+'.json';
+    a.click(); URL.revokeObjectURL(url);
+    toast('\u2705 JSON downloaded!','success');
+  } catch(e){ toast('JSON error: '+e.message,'error'); }
+}
+
+async function doDownloadPDF(){
+  if(!selField){ toast('Select a field first','warn'); return; }
+  toast('&#x1F4C4; Generating PDF...','info');
+  try{
+    var payload = JSON.parse(JSON.stringify(selField));
+    payload.ai_insights = (D&&D.ai_insights)||'';
+    var r = await fetch(API+'/api/generate-report',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok) throw new Error(await r.text());
+    var blob = await r.blob();
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url; a.download = 'lineage_'+selField.field_name+'_'+new Date().toISOString().slice(0,10)+'.pdf';
+    a.click(); URL.revokeObjectURL(url);
+    toast('\u2705 PDF downloaded!','success');
+  } catch(e){ toast('PDF error: '+e.message,'error'); }
+}
+
+// ── MULTI-FIELD SEARCH ─────────────────────────────────────────────────────────
+async function doMultiSearch(){
+  var raw = el('multi-ta').value.trim();
+  if(!raw){ toast('Enter at least one field name','warn'); return; }
+  var fields = raw.split(/[\n\r,]+/).map(function(f){return f.trim();}).filter(Boolean);
+  if(!fields.length){ toast('No valid field names','warn'); return; }
+
+  el('top-bar').style.display = 'block';
+  el('exp-row').style.display = 'none';
+  hide('st-empty');
+  hideAllPanes();
+  showTab('multi');
+  el('multi-action-bar').style.display = 'flex';
+  el('mab-stats').textContent = fields.length + ' fields';
+  el('res-title').textContent = 'Multi-Field: '+fields.length+' fields';
+  el('multi-summary').textContent = 'Searching '+fields.length+' fields...';
+  el('multi-results').innerHTML = '<div style="color:var(--t2);font-size:11px;padding:20px 0">\u23F3 Running multi-field search...</div>';
+
+  try{
+    var body = {
+      fields:         fields,
+      use_erwin:      srcs.erwin,
+      use_data_dict:  srcs.dict,
+      use_code_repo:  srcs.code,
+      use_tachyon:    srcs.tachyon,
+      erwin_base_url:     gv('cf-erwin-url')      || null,
+      erwin_api_key:      gv('cf-erwin-key')      || null,
+      erwin_system:       gv('cf-erwin-system')   || null,
+      erwin_env:          gv('cf-erwin-env')       || null,
+      erwin_project:      gv('cf-erwin-project')  || null,
+      erwin_lineage_type: gv('cf-erwin-lintype')  || 'DUAL',
+      erwin_ep_tablename: gv('cf-ep-tablename')   || null,
+      erwin_ep_colname:   gv('cf-ep-colname')     || null,
+      erwin_ep_objtype:   gv('cf-ep-objtype')     || 'TABLE',
+      erwin_ep_mapname:   gv('cf-ep-mapname')     || null,
+      erwin_ep_glosscat:  gv('cf-ep-glosscat')    || null,
+      local_meta_dir: gv('cf-meta')        || null,
+      local_dict_dir: gv('cf-dict')        || null,
+      local_code_dir: gv('cf-local')       || null,
+      tachyon_url:    gv('cf-tachyon-url') || null,
+      tachyon_key:    gv('cf-tachyon-key') || null,
+    };
+    var r = await fetch(API+'/api/multi-search',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!r.ok) throw new Error(await r.text());
+    var d = await r.json();
+
+    el('mab-stats').textContent = d.summary + ' · ' + d.search_time_ms + 'ms';
+    // Build combined D so Lineage/Metadata/Sources tabs work
+    D = {
+      query: fields.join(', '),
+      nodes: d.combined_graph ? d.combined_graph.nodes : [],
+      edges: d.combined_graph ? d.combined_graph.edges : [],
+      metadata: d.combined_metadata || [],
+      sources_used: ['Multi-Field Search ['+fields.length+' fields]'],
+      source_details: {},
+      search_time_ms: d.search_time_ms,
+      ai_insights: null
+    };
+
+    // Show export buttons and update result bar
+    el('exp-row').style.display = 'flex';
+    el('stat-pills').innerHTML =
+      '<div class="spill sp-live"><div class="sdot" style="background:var(--teal)"></div>' + fields.length + ' fields searched</div>' +
+      '<div class="spill"><div class="sdot" style="background:var(--t2)"></div>' + D.nodes.length + ' nodes</div>' +
+      '<div class="spill"><div class="sdot" style="background:var(--t2)"></div>\u23F1 ' + d.search_time_ms + 'ms</div>';
+
+    renderMetadata(D.metadata);
+    renderSources(D);
+    renderMultiResults(d);
+
+  } catch(e){
+    el('multi-results').innerHTML = '<div style="color:var(--rose2);font-size:11px;padding:20px">\u274C Error: '+esc(e.message)+'</div>';
+    toast('Multi-search error: '+e.message,'error');
+  }
+}
+
+function renderMultiResults(d){
+    el('multi-summary').textContent = '\u2705 ' + d.summary + ' \u00B7 ' + d.search_time_ms + 'ms';
+
+  // Render dedicated action bar above results
+  el('multi-results').innerHTML =
+    '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+      '<button onclick="showTab(\'lineage\');setTimeout(function(){setLevel(\'table\');},80)" ' +
+        'style="display:flex;align-items:center;gap:6px;padding:9px 16px;' +
+        'background:linear-gradient(135deg,var(--gold3),var(--teal3));' +
+        'border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;' +
+        'cursor:pointer;box-shadow:0 0 16px rgba(245,166,35,.3);transition:all .2s">' +
+        '\uD83D\uDD78 View Combined Lineage Graph</button>' +
+      '<button onclick="showTab(\'metadata\')" ' +
+        'style="display:flex;align-items:center;gap:6px;padding:9px 16px;' +
+        'background:linear-gradient(135deg,var(--teal3),var(--sky));' +
+        'border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;' +
+        'cursor:pointer;box-shadow:0 0 16px rgba(0,201,177,.25);transition:all .2s">' +
+        '\uD83D\uDCCB View All Metadata</button>' +
+      '<button onclick="showTab(\'sources\')" ' +
+        'style="display:flex;align-items:center;gap:6px;padding:9px 16px;' +
+        'background:var(--panel);border:1px solid var(--bdr2);' +
+        'border-radius:7px;color:var(--t0);font-size:12px;font-weight:700;cursor:pointer">' +
+        '\uD83D\uDCE1 View Sources</button>' +
+    '</div>';
+
+  var html = d.fields_searched.map(function(field){
+    var res = d.results_by_field[field];
+    if(res && res.error){
+      return '<div class="mres-card"><div class="mres-hdr">'+esc(field)+'</div><div style="color:var(--rose2);font-size:10px">\u274C '+esc(res.error)+'</div></div>';
+    }
+    if(!res) return '';
+    var meta   = res.metadata||[];
+    var first  = meta[0]||{};
+    var conf   = first.confidentiality||'Internal';
+    var equivs = first.equivalent_fields||[];
+    var sors   = first.sors||[];
+    var hops   = first.lineage_hops||[];
+    var ing    = first.ingestion_pattern||'Batch';
+    var erwinStat = res.erwin_status||'mock';
+
+    return '<div class="mres-card">'+
+      '<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap">'+
+        '<div class="mres-hdr" style="margin-bottom:0">'+esc(field)+'</div>'+
+        confBadge(conf)+
+        '<span class="ing-pill '+(ing==='Real-Time Streaming'?'ing-rt':'ing-batch')+'">'+esc(ing)+'</span>'+
+        '<span style="margin-left:auto;font-size:9px;color:var(--t2);font-family:\'JetBrains Mono\',monospace">'+esc(erwinStat)+'</span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'+
+        '<div>'+
+          '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:\'JetBrains Mono\',monospace">Systems of Record</div>'+
+          sors.slice(0,4).map(function(s){
+            return '<div class="sor-card '+(s.is_authoritative?'auth':'')+'" onclick="doSetSOR(\''+esc(field)+'\',\''+esc(s.sor)+'\')" style="padding:4px 7px;margin-bottom:3px">'+
+              '<div class="sor-name" style="font-size:9px">'+esc(s.sor)+'</div>'+
+              (s.is_authoritative?'<span class="sor-auth" style="font-size:7px">\u2605</span>':'')+
+            '</div>';
+          }).join('')+
+        '</div>'+
+        '<div>'+
+          '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:\'JetBrains Mono\',monospace">Equivalent Fields</div>'+
+          (equivs.length?equivs.slice(0,5).map(function(e){
+            return '<span class="eq-item '+(e.alias_type==='known_equivalent'?'eq-exact':'')+'" style="font-size:8px" title="'+esc(e.alias_type)+'" onclick="setQ(\''+esc(e.field)+'\');doSearch()">'+esc(e.field)+'</span>';
+          }).join(''):'<span style="color:var(--t3);font-size:9px">None found</span>')+
+        '</div>'+
+      '</div>'+
+      (hops.length?
+        '<div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--bdr)">'+
+          '<div style="font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;font-family:\'JetBrains Mono\',monospace">Lineage Path ('+hops.length+' hops)</div>'+
+          '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'+
+            hops.map(function(h,i){
+              return '<span style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--t1)">'+esc(h.system||h.table||'')+'</span>'+(i<hops.length-1?'<span style="color:var(--t3)">&rarr;</span>':'');
+            }).join('')+
+          '</div>'+
+        '</div>':'') +
+      '<div style="margin-top:9px;display:flex;gap:6px">'+
+        '<button onclick="setQ(\''+esc(field)+'\');doSearch()" '+
+        'style="flex:1;height:26px;background:linear-gradient(135deg,var(--gold3),var(--teal3));border:none;border-radius:4px;color:#fff;font-size:10px;font-weight:700;cursor:pointer">'+
+        '\u26A1 Search This Field</button>'+
+        '<button onclick="setQ(\''+esc(field)+'\');doSearch();setTimeout(function(){showTab(\'lineage\');},800)" '+
+        'style="flex:1;height:26px;background:linear-gradient(135deg,var(--teal3),var(--sky));border:none;border-radius:4px;color:#fff;font-size:10px;font-weight:700;cursor:pointer">'+
+        '\uD83D\uDD78 View Lineage</button>'+
+      '</div>'+
+      '</div>';
+  }).join('');
+  el('multi-results').innerHTML += html;
+  el('multi-bottom-bar').style.display = 'flex';
+  // Add bottom action bar too (legacy)
+  el('multi-results').innerHTML +=
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;' +
+    'padding-top:12px;border-top:1px solid var(--bdr2)">' +
+      '<button onclick="showTab(\'lineage\');setTimeout(function(){setLevel(\'table\');},80)" ' +
+        'style="display:flex;align-items:center;gap:6px;padding:9px 16px;' +
+        'background:linear-gradient(135deg,var(--gold3),var(--teal3));' +
+        'border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;' +
+        'cursor:pointer;box-shadow:0 0 16px rgba(245,166,35,.3)">' +
+        '\uD83D\uDD78 View Combined Lineage Graph</button>' +
+      '<button onclick="showTab(\'metadata\')" ' +
+        'style="display:flex;align-items:center;gap:6px;padding:9px 16px;' +
+        'background:linear-gradient(135deg,var(--teal3),var(--sky));' +
+        'border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;' +
+        'cursor:pointer;box-shadow:0 0 16px rgba(0,201,177,.25)">' +
+        '\uD83D\uDCCB View All Metadata</button>' +
+    '</div>';
+}
+
+// ── UPLOAD ─────────────────────────────────────────────────────────────────────
+// ── ERWIN API EXPLORER ───────────────────────────────────────────────────────
+var erwinEndpoints = [];
+
+async function loadErwinEndpoints() {
+  el('erwin-ep-count').textContent = 'Loading...';
+  el('erwin-ep-list').innerHTML = '<div style="color:var(--t2);font-size:11px;padding:16px 0">&#x23F3; Discovering endpoints...</div>';
+  try {
+    var r = await fetch(API + '/api/erwin/endpoints');
+    if (!r.ok) throw new Error(await r.text());
+    var d = await r.json();
+    erwinEndpoints = d.endpoints;
+    el('erwin-ep-count').textContent = d.total + ' endpoints' + (d.swagger_discovered ? ' (Swagger)' : ' (built-in registry)');
+    renderErwinEndpoints(d);
+    populateErwinSelect(d.endpoints);
+  } catch(e) {
+    el('erwin-ep-count').textContent = 'Error: ' + e.message;
+    el('erwin-ep-list').innerHTML = '<div style="color:var(--rose2);font-size:11px;padding:16px">' + esc(e.message) + '</div>';
+  }
+}
+
+function populateErwinSelect(eps) {
+  var sel = el('erwin-ep-select');
+  sel.innerHTML = '<option value="">-- Select endpoint --</option>';
+  eps.forEach(function(ep) {
+    var opt = document.createElement('option');
+    opt.value = ep.path;
+    opt.textContent = ep.method + ' ' + ep.path;
+    sel.appendChild(opt);
+  });
+}
+
+function onErwinEpSelect(path) {
+  var ep = erwinEndpoints.find(function(e){ return e.path === path; });
+  if (!ep) { el('erwin-ep-desc').textContent = 'Select an endpoint above'; el('erwin-param-builder').innerHTML = ''; return; }
+  el('erwin-ep-desc').textContent = ep.description || ep.path;
+  // Build param inputs
+  var pb = el('erwin-param-builder');
+  if (!ep.params || !ep.params.length) { pb.innerHTML = '<div style="font-size:10px;color:var(--t2)">No parameters required</div>'; return; }
+  var defaults = {
+    tableName:       el('q') ? el('q').value.split('.').pop().toUpperCase() : '',
+    columnName:      el('q') ? (el('q').value.split('.')[1] || '') : '',
+    systemName:      gv('cf-erwin-system'),
+    environmentName: gv('cf-erwin-env'),
+    lineageType:     gv('cf-erwin-lintype') || 'DUAL',
+    projectIds:      gv('cf-erwin-project'),
+    name:            el('q') ? el('q').value.split('.').pop().toUpperCase() : '',
+    type:            'TABLE',
+  };
+  var rows = '';
+  ep.params.forEach(function(p) {
+    var req = ep.required && ep.required.includes(p);
+    rows += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">' +
+      '<label style="font-size:9px;color:'+(req?'var(--gold2)':'var(--t2)')+
+      ';font-family:JetBrains Mono,monospace;min-width:140px;flex-shrink:0">' +
+      esc(p) + (req?' *':'') + '</label>' +
+      '<input id="erwin-p-'+esc(p)+'" class="cfg-in" style="flex:1;margin-bottom:0" ' +
+      'value="'+esc(defaults[p]||'')+'" placeholder="'+esc(p)+'"/>' +
+      '</div>';
+  });
+  pb.innerHTML = '<div style="font-size:9px;color:var(--t2);margin-bottom:6px;font-family:JetBrains Mono,monospace">* = required</div>' + rows;
+}
+
+async function callErwinEndpoint() {
+  var path = el('erwin-ep-select').value;
+  if (!path) { toast('Select an endpoint first', 'warn'); return; }
+  var ep = erwinEndpoints.find(function(e){ return e.path === path; });
+  if (!ep) return;
+  // Collect params
+  var params = {};
+  (ep.params||[]).forEach(function(p) {
+    var inp = el('erwin-p-' + p);
+    if (inp && inp.value.trim()) params[p] = inp.value.trim();
+  });
+  el('erwin-call-result').style.display = 'block';
+  el('erwin-result-status').innerHTML = '<span style="color:var(--gold2)">&#x23F3; Calling ' + esc(path) + '...</span>';
+  el('erwin-result-json').textContent = '';
+  try {
+    var r = await fetch(API + '/api/erwin/call', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        path: path, method: ep.method || 'GET', params: params,
+        base_url: gv('cf-erwin-url') || null,
+        api_key:  gv('cf-erwin-key') || null,
+      })
+    });
+    var d = await r.json();
+    var statusColor = d.status_code === 200 ? 'var(--lime2)' : 'var(--rose2)';
+    el('erwin-result-status').innerHTML = '<span style="color:'+statusColor+'">HTTP ' + d.status_code + '</span>';
+    el('erwin-result-endpoint').textContent = d.endpoint;
+    el('erwin-result-json').textContent = JSON.stringify(d.response, null, 2);
+    toast((d.status_code===200 ? '✅ ' : '⚠️ ') + 'HTTP ' + d.status_code + ' — ' + path, d.status_code===200?'success':'warn');
+  } catch(e) {
+    el('erwin-result-status').innerHTML = '<span style="color:var(--rose2)">Error: ' + esc(e.message) + '</span>';
+    toast('Call failed: ' + e.message, 'error');
+  }
+}
+
+async function callAndSearch() {
+  // Call endpoint first, then trigger lineage search using tableName param
+  var tableInput = el('erwin-p-tableName') || el('erwin-p-name');
+  if (tableInput && tableInput.value) {
+    el('q').value = tableInput.value;
+  }
+  await callErwinEndpoint();
+  await doSearch();
+  showTab('lineage');
+}
+
+async function loadErwinSwagger() {
+  el('erwin-call-result').style.display = 'block';
+  el('erwin-result-status').innerHTML = '<span style="color:var(--gold2)">&#x23F3; Fetching Swagger spec...</span>';
+  el('erwin-result-json').textContent = '';
+  try {
+    var r = await fetch(API + '/api/erwin/swagger');
+    if (!r.ok) { var e = await r.json(); throw new Error(e.detail||r.statusText); }
+    var d = await r.json();
+    el('erwin-result-status').innerHTML = '<span style="color:var(--lime2)">&#x2705; Swagger spec loaded</span>';
+    el('erwin-result-endpoint').textContent = 'OpenAPI ' + (d.openapi||d.swagger||'spec');
+    var paths = Object.keys(d.paths||{});
+    el('erwin-result-json').textContent = 'Paths found: ' + paths.length + '\n\n' + JSON.stringify(d.info||{}, null, 2) + '\n\nEndpoints:\n' + paths.join('\n');
+    toast('✅ Swagger spec: ' + paths.length + ' paths found', 'success');
+  } catch(e) {
+    el('erwin-result-status').innerHTML = '<span style="color:var(--rose2)">Error: ' + esc(e.message) + '</span>';
+    toast('Swagger error: ' + e.message, 'warn');
+  }
+}
+
+function renderErwinEndpoints(data) {
+  var groups = {};
+  data.endpoints.forEach(function(ep) {
+    var grp = (ep.path.split('/').filter(Boolean)[1]) || 'other';
+    if (!groups[grp]) groups[grp] = [];
+    groups[grp].push(ep);
+  });
+  var container = document.createElement('div');
+  Object.keys(groups).sort().forEach(function(grp) {
+    var grpDiv = document.createElement('div');
+    grpDiv.style.marginBottom = '12px';
+    var grpHdr = document.createElement('div');
+    grpHdr.style.cssText = 'font-size:10px;font-weight:700;color:var(--gold2);font-family:monospace;margin-bottom:6px;text-transform:uppercase';
+    grpHdr.textContent = grp.toUpperCase() + ' (' + groups[grp].length + ')';
+    grpDiv.appendChild(grpHdr);
+    groups[grp].forEach(function(ep) {
+      var row = document.createElement('div');
+      row.style.cssText = 'background:var(--panel);border:1px solid var(--bdr);border-radius:5px;padding:7px 10px;margin-bottom:4px;cursor:pointer';
+      row.onmouseover = function(){ this.style.background='var(--panel2)'; };
+      row.onmouseout  = function(){ this.style.background='var(--panel)'; };
+      var epPath = ep.path;
+      row.onclick = function(){ el('erwin-ep-select').value=epPath; onErwinEpSelect(epPath); };
+      var top = document.createElement('div');
+      top.style.display = 'flex'; top.style.gap = '7px'; top.style.alignItems = 'center';
+      var badge = document.createElement('span');
+      badge.style.cssText = 'background:rgba(0,201,177,.12);color:var(--teal2);border:1px solid rgba(0,201,177,.2);border-radius:3px;padding:1px 6px;font-size:9px;font-weight:700;font-family:monospace';
+      badge.textContent = ep.method;
+      var pth = document.createElement('span');
+      pth.style.cssText = 'font-family:monospace;font-size:10px;color:var(--t0)';
+      pth.textContent = ep.path;
+      top.appendChild(badge); top.appendChild(pth);
+      if (ep.required && ep.required.length) {
+        var r2 = document.createElement('span');
+        r2.style.cssText = 'font-size:8px;color:var(--rose2)';
+        r2.textContent = 'requires: ' + ep.required.join(', ');
+        top.appendChild(r2);
+      }
+      row.appendChild(top);
+      if (ep.description) {
+        var d2 = document.createElement('div');
+        d2.style.cssText = 'font-size:9px;color:var(--t2);margin-top:2px';
+        d2.textContent = ep.description;
+        row.appendChild(d2);
+      }
+      if (ep.params && ep.params.length) {
+        var p2 = document.createElement('div');
+        p2.style.cssText = 'font-size:8px;color:var(--t3);margin-top:2px;font-family:monospace';
+        p2.textContent = 'params: ' + ep.params.join(', ');
+        row.appendChild(p2);
+      }
+      grpDiv.appendChild(row);
+    });
+    container.appendChild(grpDiv);
+  });
+  el('erwin-ep-list').innerHTML = '';
+  el('erwin-ep-list').appendChild(container);
+}
+
+async function doUpload(input){
+  var file = input.files[0]; if(!file) return;
+  var statusEl = el('upload-status');
+  statusEl.style.color = 'var(--gold2)';
+  statusEl.textContent = '\u23F3 Uploading '+file.name+'...';
+  try{
+    var fd = new FormData();
+    fd.append('file', file);
+    var r = await fetch(API+'/api/upload-inputs',{method:'POST', body:fd});
+    if(!r.ok) throw new Error(await r.text());
+    var d = await r.json();
+    statusEl.style.color = 'var(--lime2)';
+    if(d.fields_detected && d.fields_detected.length){
+      statusEl.textContent = '\u2705 '+d.total_fields_detected+' fields detected';
+      el('multi-ta').value = d.fields_detected.slice(0,10).join('\n');
+      toast('\u2705 '+d.total_fields_detected+' fields loaded into Multi-Field','success');
+    } else if(d.extracted_files){
+      statusEl.textContent = '\u2705 Extracted '+d.extracted_files.length+' files';
+      toast('\u2705 Extracted '+d.extracted_files.length+' files','success');
+    } else {
+      statusEl.textContent = '\u2705 File uploaded';
+      toast('\u2705 Uploaded successfully','success');
+    }
+  } catch(e){
+    statusEl.style.color = 'var(--rose2)';
+    statusEl.textContent = '\u274C '+e.message;
+    toast('Upload error: '+e.message,'error');
+  }
+  input.value = '';
+}
+</script>
+</body>
+</html>
